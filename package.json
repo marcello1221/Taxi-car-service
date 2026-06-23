@@ -1,0 +1,22 @@
+{
+  "name": "taxi-car-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pre-book taxi service platform — user web, user app, driver app",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/api & npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:user-app": "npm run start --workspace=apps/mobile-user",
+    "dev:driver-app": "npm run start --workspace=apps/mobile-driver",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

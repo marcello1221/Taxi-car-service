@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Taxi User",
+    "slug": "taxi-user",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "taxi-user",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0a0e17"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.taxicarservice.user",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to set pickup address for your ride."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0e17"
+      },
+      "package": "com.taxicarservice.user",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": ["expo-router"]
+  }
+}

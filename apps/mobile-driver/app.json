@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Taxi Driver",
+    "slug": "taxi-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "taxi-driver",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0a0e17"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.taxicarservice.driver"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0e17"
+      },
+      "package": "com.taxicarservice.driver"
+    },
+    "plugins": ["expo-router"]
+  }
+}
