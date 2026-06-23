@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: taxi-car-service-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace=@taxi/shared && npm run build --workspace=@taxi/api
+    startCommand: npm run start --workspace=@taxi/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: ./data/taxi.db
+      - key: ALLOWED_ORIGINS
+        sync: false

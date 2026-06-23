@@ -2,6 +2,10 @@ node_modules/
 dist/
 .next/
 .expo/
+deploy/web/node_modules/
+deploy/web/.next/
+deploy/api/node_modules/
+deploy/api/dist/
 *.log
 .env
 .env.local
@@ -12,3 +16,9 @@ dist/
 *.db-wal
 .turbo/
 coverage/
+.vercel
+*.apk
+exports/
+apps/mobile-driver/android/
+deploy/owner/node_modules/
+deploy/owner/.next/

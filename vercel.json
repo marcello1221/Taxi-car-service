@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --workspace=@taxi/web --workspace=@taxi/shared --include-workspace-root",
+  "buildCommand": "npm run build:shared && npm run build:web",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs"
+}

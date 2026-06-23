@@ -10,13 +10,24 @@
   "scripts": {
     "dev": "npm run dev --workspace=apps/api & npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
-    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:web": "npm run dev --prefix deploy/web",
+    "dev:owner": "npm run dev --prefix deploy/owner",
     "dev:user-app": "npm run start --workspace=apps/mobile-user",
     "dev:driver-app": "npm run start --workspace=apps/mobile-driver",
-    "build": "npm run build --workspaces --if-present",
+    "build:g63-apk": "npm run build:shared && cd apps/mobile-driver && npx expo prebuild --platform android && cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../../exports/G63.apk",
+    "build": "npm run build --workspace=@taxi/shared && npm run build --workspaces --if-present",
+    "build:shared": "npm run build --workspace=@taxi/shared",
+    "build:api": "npm run build --workspace=@taxi/api",
+    "build:web": "npm run build --workspace=@taxi/web",
+    "start:api": "npm run start --workspace=@taxi/api",
+    "start:web": "npm run start --workspace=@taxi/web",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

@@ -70,12 +70,46 @@ export function getRiderCharge(lockedFare: number): number {
   return lockedFare;
 }
 
-/** Driver payout uses actual route base + mile + minute (may be less if shorter route). */
-export function getDriverPayout(
-  category: ServiceCategory,
-  actualRoute: RouteInfo
-): FareBreakdown {
-  return calculateFare(category, actualRoute);
+/** Percentages deducted from total rider payment before driver net income. */
+export const PAYMENT_FEE_RATES = {
+  companyNet: 0.15,
+  cityTax: 0.0878,
+  blackCarFund: 0.015,
+  nycSurcharge: 0.005,
+  govFee: 0.18,
+} as const;
+
+export interface RiderPaymentSplit {
+  riderCharge: number;
+  companyNetFee: number;
+  cityTax: number;
+  blackCarFund: number;
+  nycSurcharge: number;
+  govFee: number;
+  driverNet: number;
+}
+
+/** Split rider payment into company fees, taxes, and driver net income. */
+export function splitRiderPayment(riderCharge: number): RiderPaymentSplit {
+  const charge = round2(riderCharge);
+  const companyNetFee = round2(charge * PAYMENT_FEE_RATES.companyNet);
+  const cityTax = round2(charge * PAYMENT_FEE_RATES.cityTax);
+  const blackCarFund = round2(charge * PAYMENT_FEE_RATES.blackCarFund);
+  const nycSurcharge = round2(charge * PAYMENT_FEE_RATES.nycSurcharge);
+  const govFee = round2(charge * PAYMENT_FEE_RATES.govFee);
+  const driverNet = round2(
+    charge - companyNetFee - cityTax - blackCarFund - nycSurcharge - govFee
+  );
+
+  return {
+    riderCharge: charge,
+    companyNetFee,
+    cityTax,
+    blackCarFund,
+    nycSurcharge,
+    govFee,
+    driverNet,
+  };
 }
 
 /**

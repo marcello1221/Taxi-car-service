@@ -41,6 +41,65 @@ Integrated providers (configure in `.env`):
 
 Demo mode works without API keys (mock intent IDs).
 
+## Owner Platform
+
+Business dashboard for company owners and staff with role-based privileges.
+
+| Role | Privileges |
+|------|------------|
+| **Owner** | Full access — manage staff, reports, expenses, drivers |
+| **Admin** | Reports, expenses, drivers |
+| **Accountant** | Reports, expenses |
+| **Dispatcher** | Drivers, rides view |
+| **Support** | Rides view |
+
+### Reports (weekly & monthly)
+- Rider revenue (total payments)
+- Fee split from each payment:
+  - **15%** Company net fee
+  - **8.78%** City tax
+  - **1.5%** Black car fund
+  - **0.5%** NYC surcharge
+  - **18%** Gov fee
+  - **56.22%** Driver net income (remainder)
+- Operating expenses and company net after expenses
+- Completed rides, new drivers, total drivers
+- Per-driver breakdown: rides, revenue, driver net, company net (15%)
+
+### Run locally
+
+```bash
+npm run dev:owner    # http://localhost:3001
+npm run dev:api      # API on :4000
+```
+
+**Default owner login:** `owner@taxi.demo` / `Owner123!`
+
+Set `OWNER_EMAIL` and `OWNER_PASSWORD` in `.env` to customize the seeded owner account.
+
+## Deployed (Production)
+
+| Service | URL |
+|---------|-----|
+| **Website** | https://taxi-car-service.vercel.app |
+| **API** | https://taxi-car-service-api.vercel.app |
+
+Deploy folders (standalone, build outside monorepo):
+
+```bash
+# Web
+cd deploy/web && npm install && npm run build
+npx vercel deploy --prod
+
+# API
+cd deploy/api && npm install && npm run build
+npx vercel deploy --prod
+```
+
+For always-on API + SQLite persistence, use `render.yaml` (Render free tier):
+
+https://render.com/deploy?repo=https://github.com/marcello1221/Taxi-car-service
+
 ## Quick Start
 
 ```bash
@@ -86,8 +145,19 @@ npm run dev:driver-app
 
 ## Demo Accounts
 
-- Rider: `user-demo` / `rider@taxi.demo`
-- Driver: `driver-demo` / `driver@taxi.demo`
+All demo passwords use the pattern `{Role}123!`. Seeded automatically when the API starts.
+
+| Role | Email | Password | Where to log in |
+|------|-------|----------|-----------------|
+| Rider | `rider@taxi.demo` | `Rider123!` | User website |
+| Driver | `driver@taxi.demo` | `Driver123!` | G63 Driver app |
+| Owner | `owner@taxi.demo` | `Owner123!` | Owner portal |
+| Admin | `admin@taxi.demo` | `Admin123!` | Owner portal |
+| Accountant | `accountant@taxi.demo` | `Accountant123!` | Owner portal |
+| Dispatcher | `dispatcher@taxi.demo` | `Dispatcher123!` | Owner portal |
+| Support | `support@taxi.demo` | `Support123!` | Owner portal |
+
+Override owner credentials with `OWNER_EMAIL` and `OWNER_PASSWORD` in `.env` (owner is only created if missing).
 
 ## License
 

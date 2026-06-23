@@ -1,0 +1,21 @@
+:root {
+  --bg-deep: #0a0e17;
+  --bg-card: #12182a;
+  --bg-elevated: #1a2238;
+  --accent-teal: #00d4aa;
+  --accent-purple: #7c3aed;
+  --accent-gold: #f59e0b;
+  --text-primary: #f0f4ff;
+  --text-muted: #8b95b5;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+button, input, select { font-family: inherit; }

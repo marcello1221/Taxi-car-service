@@ -9,7 +9,9 @@ export type RideStatus =
   | 'completed'
   | 'cancelled';
 
-export type PaymentProvider = 'stripe' | 'tabapay' | 'currencycloud';
+export type PaymentProvider = 'stripe';
+
+export type CardType = 'visa' | 'mastercard' | 'amex' | 'debit' | 'credit';
 
 export interface Coordinates {
   lat: number;
@@ -55,6 +57,10 @@ export interface Ride {
   riderApprovedEta?: boolean;
   paymentProvider?: PaymentProvider;
   paymentIntentId?: string;
+  riderCharge?: number;
+  driverPayout?: number;
+  platformNet?: number;
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
