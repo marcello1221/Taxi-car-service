@@ -110,10 +110,10 @@ export default function BookingApp() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Sign up failed');
       persistUser(data);
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -126,13 +126,13 @@ export default function BookingApp() {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authForm.email, password: authForm.password }),
+        body: JSON.stringify({ email: authForm.email.trim(), password: authForm.password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Login failed');
       persistUser(data);
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -333,6 +333,11 @@ export default function BookingApp() {
                     Sign in
                   </button>
                 </div>
+                {authMode === 'login' && (
+                  <p className={styles.authHint}>
+                    Demo rider: <strong>rider@taxi.demo</strong> / <strong>Rider123!</strong>
+                  </p>
+                )}
                 {authMode === 'signup' && (
                   <div className={styles.field}>
                     <label>Full name</label>

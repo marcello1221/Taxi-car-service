@@ -4,7 +4,8 @@ import dotenv from 'dotenv';
 import cron from 'node-cron';
 import { SERVICE_CATEGORIES } from '@taxi/shared';
 import { seedDemoData, getRideById } from './db';
-import { seedDemoUsers } from './services/demoUsers';
+import { seedDemoUsers, DEMO_CREDENTIALS } from './services/demoUsers';
+import { errorMessage } from './utils/errors';
 import {
   quoteRide,
   bookRide,
@@ -16,7 +17,6 @@ import {
   runEtaConfirmationJob,
 } from './services/rides';
 import { geocodeAddress } from './services/maps';
-import { getOrCreateUser } from './db';
 import { registerRider, authenticateRider, getUserById } from './services/auth';
 import { loginStaff, addStaffMember, getStaffList, changeStaffRole, removeStaffMember } from './services/staff';
 import { buildBusinessReport, addExpense, getDriversOverview } from './services/reports';
@@ -66,18 +66,23 @@ app.post('/api/auth/signup', (req, res) => {
     const user = registerRider(req.body);
     res.status(201).json(user);
   } catch (err) {
-    const message = String(err);
+    const message = errorMessage(err);
     res.status(message.includes('already exists') ? 409 : 400).json({ error: message });
   }
 });
 
 app.post('/api/auth/login', (req, res) => {
   try {
+    seedDemoUsers();
     const { email, password } = req.body as { email: string; password: string };
+    if (!email?.trim() || !password) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
+    }
     const user = authenticateRider(email, password);
     res.json(user);
   } catch (err) {
-    res.status(401).json({ error: String(err) });
+    res.status(401).json({ error: errorMessage(err) });
   }
 });
 
@@ -90,10 +95,13 @@ app.get('/api/auth/me/:userId', (req, res) => {
   res.json(user);
 });
 
-app.post('/api/auth/demo', (req, res) => {
-  const { email, name, role } = req.body as { email: string; name: string; role: 'rider' | 'driver' };
-  const user = getOrCreateUser(email || 'demo@taxi.com', name || 'Demo User', role || 'rider');
-  res.json(user);
+app.post('/api/auth/demo', (_req, res) => {
+  seedDemoUsers();
+  const rider = DEMO_CREDENTIALS.find((d) => d.role === 'Rider');
+  res.json({
+    message: 'Use POST /api/auth/login with email and password',
+    demo: rider ? { email: rider.email, password: rider.password } : null,
+  });
 });
 
 app.post('/api/geocode', async (req, res) => {
@@ -174,11 +182,16 @@ app.post('/api/rides/:id/complete', async (req, res) => {
 /* ── Owner platform ── */
 app.post('/api/owner/auth/login', (req, res) => {
   try {
+    seedDemoUsers();
     const { email, password } = req.body as { email: string; password: string };
+    if (!email?.trim() || !password) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
+    }
     const staff = loginStaff(email, password);
     res.json(staff);
   } catch (err) {
-    res.status(401).json({ error: String(err) });
+    res.status(401).json({ error: errorMessage(err) });
   }
 });
 
