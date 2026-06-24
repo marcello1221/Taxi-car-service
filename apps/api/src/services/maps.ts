@@ -240,7 +240,6 @@ async function searchPlacesNominatim(
       const top = location.lat + delta;
       const bottom = location.lat - delta;
       params.set('viewbox', `${left},${top},${right},${bottom}`);
-      params.set('bounded', '1');
     }
 
     const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {

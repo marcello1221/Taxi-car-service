@@ -239,6 +239,16 @@ export default function BookingApp() {
     }
   };
 
+  const handlePickupSelect = (addr: Address) => {
+    setPickup(addr);
+    setPickupText(addr.formatted);
+  };
+
+  const handleDropoffSelect = (addr: Address) => {
+    setDropoff(addr);
+    setDropoffText(addr.formatted);
+  };
+
   const getQuote = async () => {
     if (!user) {
       setError('Please sign up or sign in to book');
@@ -319,6 +329,21 @@ export default function BookingApp() {
       body: JSON.stringify({ approved }),
     });
     setPendingApproval(null);
+  };
+
+  const cancelBookedRide = async (rideId: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/rides/${rideId}/cancel`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not cancel ride');
+      setBookedRide(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel ride');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const cardLabel = ACCEPTED_CARD_TYPES.find((c) => c.id === cardType)?.label ?? 'Card';
@@ -461,7 +486,7 @@ export default function BookingApp() {
                         id="pickup-address"
                         value={pickupText}
                         onChange={handlePickupTextChange}
-                        onSelect={(addr) => setPickup(addr)}
+                        onSelect={handlePickupSelect}
                         onBlurFallback={(text) => geocodeField(text, 'pickup')}
                         placeholder="e.g. 350 5th Ave, New York, NY"
                         isLoaded={isLoaded}
@@ -481,11 +506,11 @@ export default function BookingApp() {
                         id="dropoff-address"
                         value={dropoffText}
                         onChange={handleDropoffTextChange}
-                        onSelect={(addr) => setDropoff(addr)}
+                        onSelect={handleDropoffSelect}
                         onBlurFallback={(text) => geocodeField(text, 'dropoff')}
                         placeholder="e.g. JFK Airport, Queens, NY"
                         isLoaded={isLoaded}
-                        locationBias={pickup ?? nearbyBias}
+                        locationBias={nearbyBias}
                         inputClassName={styles.addressInput}
                       />
                     </div>
@@ -554,13 +579,31 @@ export default function BookingApp() {
               </>
             ) : step === 'success' && bookedRide ? (
               <div className={styles.success}>
-                <div className={styles.successIcon}>✓</div>
-                <h3>Ride booked!</h3>
-                <p>Your {SERVICE_CATEGORIES[bookedRide.category].label} ride is confirmed.</p>
-                <p className={styles.lockedFare}>Locked fare: {formatUSD(bookedRide.lockedFare)}</p>
-                <button className={styles.btnPrimary} onClick={() => { setStep('book'); setQuote(null); }}>
-                  Book another ride
-                </button>
+                <div className={styles.successIcon}>{bookedRide.status === 'cancelled' ? '✕' : '✓'}</div>
+                <h3>{bookedRide.status === 'cancelled' ? 'Ride cancelled' : 'Ride booked!'}</h3>
+                <p>
+                  {bookedRide.status === 'cancelled'
+                    ? 'Your booking has been cancelled.'
+                    : `Your ${SERVICE_CATEGORIES[bookedRide.category].label} ride is confirmed.`}
+                </p>
+                {bookedRide.status !== 'cancelled' && (
+                  <p className={styles.lockedFare}>Locked fare: {formatUSD(bookedRide.lockedFare)}</p>
+                )}
+                {error && <p className={styles.error}>{error}</p>}
+                <div className={styles.btnRow}>
+                  {bookedRide.status !== 'cancelled' && (
+                    <button
+                      className={styles.btnSecondary}
+                      onClick={() => void cancelBookedRide(bookedRide.id)}
+                      disabled={loading}
+                    >
+                      {loading ? 'Cancelling…' : 'Cancel ride'}
+                    </button>
+                  )}
+                  <button className={styles.btnPrimary} onClick={() => { setStep('book'); setQuote(null); setBookedRide(null); }}>
+                    Book another ride
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>

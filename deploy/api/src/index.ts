@@ -11,6 +11,7 @@ import {
   bookRide,
   approveEtaUpdate,
   assignDriver,
+  cancelRide,
   completeRide,
   getAvailableRidesForDrivers,
   getUserRides,
@@ -183,6 +184,15 @@ app.get('/api/rides/:id', (req, res) => {
 app.post('/api/rides/:id/eta-approval', (req, res) => {
   const { approved } = req.body as { approved: boolean };
   const ride = approveEtaUpdate(req.params.id, approved);
+  if (!ride) {
+    res.status(404).json({ error: 'Ride not found' });
+    return;
+  }
+  res.json(ride);
+});
+
+app.post('/api/rides/:id/cancel', (req, res) => {
+  const ride = cancelRide(req.params.id);
   if (!ride) {
     res.status(404).json({ error: 'Ride not found' });
     return;

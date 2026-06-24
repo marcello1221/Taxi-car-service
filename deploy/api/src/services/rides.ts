@@ -132,6 +132,14 @@ export function approveEtaUpdate(rideId: string, approved: boolean) {
   });
 }
 
+export function cancelRide(rideId: string) {
+  const ride = getRideById(rideId);
+  if (!ride) return null;
+  if (ride.status === 'completed' || ride.status === 'cancelled') return ride;
+
+  return updateRide(rideId, { status: 'cancelled' });
+}
+
 export function assignDriver(rideId: string, driverId: string) {
   return updateRide(rideId, { driverId, status: 'assigned' });
 }
