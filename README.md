@@ -73,7 +73,7 @@ npm run dev:owner    # http://localhost:3001
 npm run dev:api      # API on :4000
 ```
 
-**Default owner login:** `owner@taxi.demo` / `Owner123!`
+**Default owner login:** `owner@taxi.demo` / `owner1234A`
 
 Set `OWNER_EMAIL` and `OWNER_PASSWORD` in `.env` to customize the seeded owner account.
 
@@ -151,7 +151,7 @@ All demo passwords use the pattern `{Role}123!`. Seeded automatically when the A
 |------|-------|----------|-----------------|
 | Rider | `rider@taxi.demo` | `Rider123!` | User website |
 | Driver | `driver@taxi.demo` | `Driver123!` | G63 Driver app |
-| Owner | `owner@taxi.demo` | `Owner123!` | Owner portal |
+| Owner | `owner@taxi.demo` | `owner1234A` | Owner portal |
 | Admin | `admin@taxi.demo` | `Admin123!` | Owner portal |
 | Accountant | `accountant@taxi.demo` | `Accountant123!` | Owner portal |
 | Dispatcher | `dispatcher@taxi.demo` | `Dispatcher123!` | Owner portal |

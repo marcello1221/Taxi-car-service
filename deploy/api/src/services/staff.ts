@@ -15,7 +15,7 @@ export function seedOwnerAccount() {
   if (countStaff() > 0) return;
 
   const email = (process.env.OWNER_EMAIL || 'owner@taxi.demo').toLowerCase();
-  const password = process.env.OWNER_PASSWORD || 'Owner123!';
+  const password = process.env.OWNER_PASSWORD || 'owner1234A';
   createStaff({
     email,
     name: 'Platform Owner',

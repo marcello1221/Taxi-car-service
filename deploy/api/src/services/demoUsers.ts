@@ -6,6 +6,7 @@ import {
   getStaffByEmail,
   getUserByEmail,
   insertDemoUser,
+  setStaffPasswordHash,
   setUserPasswordHash,
 } from '../db';
 
@@ -19,7 +20,7 @@ export interface DemoCredential {
 export const DEMO_CREDENTIALS: DemoCredential[] = [
   { role: 'Rider', email: 'rider@taxi.demo', password: 'Rider123!', portal: 'User website (book rides)' },
   { role: 'Driver', email: 'driver@taxi.demo', password: 'Driver123!', portal: 'G63 Driver app' },
-  { role: 'Owner', email: 'owner@taxi.demo', password: 'Owner123!', portal: 'Owner portal (:3001)' },
+  { role: 'Owner', email: 'owner@taxi.demo', password: 'owner1234A', portal: 'Owner portal (:3001)' },
   { role: 'Admin', email: 'admin@taxi.demo', password: 'Admin123!', portal: 'Owner portal (:3001)' },
   { role: 'Accountant', email: 'accountant@taxi.demo', password: 'Accountant123!', portal: 'Owner portal (:3001)' },
   { role: 'Dispatcher', email: 'dispatcher@taxi.demo', password: 'Dispatcher123!', portal: 'Owner portal (:3001)' },
@@ -27,7 +28,7 @@ export const DEMO_CREDENTIALS: DemoCredential[] = [
 ];
 
 const STAFF_DEMO: { email: string; name: string; role: StaffRole; password: string }[] = [
-  { email: 'owner@taxi.demo', name: 'Platform Owner', role: 'owner', password: process.env.OWNER_PASSWORD || 'Owner123!' },
+  { email: 'owner@taxi.demo', name: 'Platform Owner', role: 'owner', password: process.env.OWNER_PASSWORD || 'owner1234A' },
   { email: 'admin@taxi.demo', name: 'Demo Admin', role: 'admin', password: 'Admin123!' },
   { email: 'accountant@taxi.demo', name: 'Demo Accountant', role: 'accountant', password: 'Accountant123!' },
   { email: 'dispatcher@taxi.demo', name: 'Demo Dispatcher', role: 'dispatcher', password: 'Dispatcher123!' },
@@ -77,14 +78,19 @@ function ensureDemoDriver() {
 function ensureDemoStaff() {
   for (const account of STAFF_DEMO) {
     const email = account.email.toLowerCase();
-    if (getStaffByEmail(email)) {
+    const hash = hashPassword(account.password);
+    const existing = getStaffByEmail(email);
+    if (existing) {
+      if (account.role === 'owner') {
+        setStaffPasswordHash(existing.id, hash);
+      }
       continue;
     }
     createStaff({
       email,
       name: account.name,
       role: account.role,
-      passwordHash: hashPassword(account.password),
+      passwordHash: hash,
       createdBy: 'system',
     });
   }

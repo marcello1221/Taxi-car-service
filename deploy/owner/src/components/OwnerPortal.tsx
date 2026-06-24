@@ -181,7 +181,7 @@ export default function OwnerPortal() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
           <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Default: owner@taxi.demo / Owner123!
+            Default: owner@taxi.demo / owner1234A
           </p>
         </div>
       </div>

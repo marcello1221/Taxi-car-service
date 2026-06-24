@@ -355,6 +355,10 @@ export function createStaff(input: {
   return getStaffById(id)!;
 }
 
+export function setStaffPasswordHash(staffId: string, passwordHash: string) {
+  db.prepare('UPDATE staff_members SET password_hash = ? WHERE id = ?').run(passwordHash, staffId);
+}
+
 export function updateStaffRole(id: string, role: StaffRole): StaffMember | null {
   db.prepare('UPDATE staff_members SET role = ? WHERE id = ?').run(role, id);
   return getStaffById(id);
