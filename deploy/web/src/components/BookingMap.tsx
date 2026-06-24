@@ -7,10 +7,16 @@ import 'leaflet/dist/leaflet.css';
 import type { Address } from '@taxi/shared';
 import styles from './BookingMap.module.css';
 
+interface RoutePoint {
+  lat: number;
+  lng: number;
+}
+
 interface BookingMapProps {
   center: { lat: number; lng: number };
   pickup: Address | null;
   dropoff: Address | null;
+  routeGeometry?: RoutePoint[];
 }
 
 const pickupIcon = L.divIcon({
@@ -31,14 +37,21 @@ function MapViewport({
   center,
   pickup,
   dropoff,
+  routeGeometry,
 }: {
   center: { lat: number; lng: number };
   pickup: Address | null;
   dropoff: Address | null;
+  routeGeometry: RoutePoint[];
 }) {
   const map = useMap();
 
   useEffect(() => {
+    if (routeGeometry.length > 1) {
+      const bounds = L.latLngBounds(routeGeometry.map((point) => [point.lat, point.lng] as [number, number]));
+      map.fitBounds(bounds.pad(0.12), { animate: true });
+      return;
+    }
     if (pickup && dropoff) {
       map.fitBounds(
         L.latLngBounds([pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]).pad(0.2),
@@ -55,19 +68,26 @@ function MapViewport({
       return;
     }
     map.setView([center.lat, center.lng], 12, { animate: true });
-  }, [center.lat, center.lng, dropoff, map, pickup]);
+  }, [center.lat, center.lng, dropoff, map, pickup, routeGeometry]);
 
   return null;
 }
 
-export default function BookingMap({ center, pickup, dropoff }: BookingMapProps) {
-  const routeLine =
-    pickup && dropoff
-      ? ([
-          [pickup.lat, pickup.lng],
-          [dropoff.lat, dropoff.lng],
-        ] as [number, number][])
-      : null;
+export default function BookingMap({
+  center,
+  pickup,
+  dropoff,
+  routeGeometry = [],
+}: BookingMapProps) {
+  const routeLine: [number, number][] =
+    routeGeometry.length > 1
+      ? routeGeometry.map((point) => [point.lat, point.lng])
+      : pickup && dropoff
+        ? [
+            [pickup.lat, pickup.lng],
+            [dropoff.lat, dropoff.lng],
+          ]
+        : [];
 
   return (
     <div className={styles.mapLayer} aria-hidden>
@@ -76,13 +96,18 @@ export default function BookingMap({ center, pickup, dropoff }: BookingMapProps)
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapViewport center={center} pickup={pickup} dropoff={dropoff} />
+        <MapViewport
+          center={center}
+          pickup={pickup}
+          dropoff={dropoff}
+          routeGeometry={routeGeometry}
+        />
         {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
         {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
-        {routeLine && (
+        {routeLine.length > 1 && (
           <Polyline
             positions={routeLine}
-            pathOptions={{ color: '#00d4aa', weight: 5, opacity: 0.85 }}
+            pathOptions={{ color: '#00d4aa', weight: 5, opacity: 0.9 }}
           />
         )}
       </MapContainer>

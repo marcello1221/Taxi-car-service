@@ -22,8 +22,7 @@ type TripFare = {
 interface TripChargePanelProps {
   fare: TripFare | null;
   loading?: boolean;
-  distanceMiles?: number;
-  durationMinutes?: number;
+  variant?: 'summary' | 'receipt';
 }
 
 function labelBorough(value?: string): string {
@@ -34,14 +33,13 @@ function labelBorough(value?: string): string {
 export default function TripChargePanel({
   fare,
   loading = false,
-  distanceMiles,
-  durationMinutes,
+  variant = 'summary',
 }: TripChargePanelProps) {
   if (loading) {
     return (
       <div className={styles.chargePanel}>
-        <h4>Trip total</h4>
-        <p className={styles.placeholder}>Calculating route, tolls, and NYC charges…</p>
+        <h4>{variant === 'receipt' ? 'Trip receipt' : 'Trip total'}</h4>
+        <p className={styles.placeholder}>Calculating your route and fare…</p>
       </div>
     );
   }
@@ -50,8 +48,21 @@ export default function TripChargePanel({
     return (
       <div className={styles.chargePanel}>
         <h4>Trip total</h4>
-        <p className={styles.placeholder}>
-          Set pickup and dropoff addresses to calculate base fare, NYC taxes, and bridge/tunnel tolls.
+        <p className={styles.placeholder}>Set pickup and dropoff to see your route and total fare.</p>
+      </div>
+    );
+  }
+
+  if (variant === 'summary') {
+    return (
+      <div className={styles.chargePanel}>
+        <h4>Trip total</h4>
+        <div className={styles.totalOnly}>
+          <span>Total</span>
+          <strong>{formatUSD(fare.total)}</strong>
+        </div>
+        <p className={styles.receiptNote}>
+          Itemized charges will be sent as a receipt at the end of your trip.
         </p>
       </div>
     );
@@ -59,24 +70,7 @@ export default function TripChargePanel({
 
   return (
     <div className={styles.chargePanel}>
-      <h4>Trip total</h4>
-
-      {(distanceMiles != null || durationMinutes != null) && (
-        <>
-          {distanceMiles != null && (
-            <div className={styles.row}>
-              <span>Distance</span>
-              <strong>{distanceMiles} mi</strong>
-            </div>
-          )}
-          {durationMinutes != null && (
-            <div className={styles.row}>
-              <span>Est. time</span>
-              <strong>{Math.round(durationMinutes)} min</strong>
-            </div>
-          )}
-        </>
-      )}
+      <h4>Trip receipt</h4>
 
       <div className={styles.sectionLabel}>Base charges</div>
       <div className={styles.row}>
@@ -129,7 +123,7 @@ export default function TripChargePanel({
       )}
 
       <div className={styles.totalRow}>
-        <span>Total amount</span>
+        <span>Total paid</span>
         <span>{formatUSD(fare.total)}</span>
       </div>
 

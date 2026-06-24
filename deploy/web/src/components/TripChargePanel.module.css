@@ -52,6 +52,24 @@
   line-height: 1.45;
 }
 
+.totalOnly {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-top: 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #00d4aa;
+}
+
+.receiptNote {
+  margin: 0.75rem 0 0;
+  color: #8b95b5;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .boroughs {
   margin-top: 0.5rem;
   color: #8b95b5;

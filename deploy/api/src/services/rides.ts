@@ -55,7 +55,7 @@ export async function quoteRide(
     dropoffBorough: charges.dropoffBorough,
   };
 
-  return { route, fare, category, charges };
+  return { route, fare, category, charges, routeGeometry: routePoints ?? [] };
 }
 
 export async function bookRide(input: {

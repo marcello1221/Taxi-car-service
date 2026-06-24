@@ -26,6 +26,7 @@ const DEFAULT_LOCATION_BIAS = { lat: 40.7128, lng: -74.006 };
 
 type Quote = {
   route: { distanceMiles: number; durationMinutes: number; durationInTrafficMinutes?: number };
+  routeGeometry?: Array<{ lat: number; lng: number }>;
   fare: {
     total: number;
     baseFare: number;
@@ -95,10 +96,17 @@ export default function BookingApp() {
         const rides: Ride[] = await res.json();
         const pending = rides.find((r) => r.status === 'awaiting_eta_approval');
         if (pending) setPendingApproval(pending);
+
+        if (bookedRide) {
+          const current = rides.find((r) => r.id === bookedRide.id);
+          if (current && current.status !== bookedRide.status) {
+            setBookedRide(current);
+          }
+        }
       } catch { /* ignore */ }
     }, 10000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, bookedRide]);
 
   useEffect(() => {
     if (!user || !pickup || !dropoff || step !== 'book') {
@@ -457,7 +465,12 @@ export default function BookingApp() {
         <section className={user && step === 'book' ? styles.tripHero : styles.hero} id="book">
           {user && step === 'book' ? (
             <div className={styles.tripPlanner}>
-              <BookingMap center={nearbyBias} pickup={pickup} dropoff={dropoff} />
+              <BookingMap
+                center={nearbyBias}
+                pickup={pickup}
+                dropoff={dropoff}
+                routeGeometry={liveQuote?.routeGeometry}
+              />
 
               <div className={styles.tripTopPanel}>
                 <h3>Book your ride</h3>
@@ -524,10 +537,7 @@ export default function BookingApp() {
                 <TripChargePanel
                   fare={liveQuote?.fare ?? null}
                   loading={quoteLoading}
-                  distanceMiles={liveQuote?.route.distanceMiles}
-                  durationMinutes={
-                    liveQuote?.route.durationInTrafficMinutes ?? liveQuote?.route.durationMinutes
-                  }
+                  variant="summary"
                 />
 
                 <div className={styles.tripBottomFields}>
@@ -632,11 +642,7 @@ export default function BookingApp() {
             ) : step === 'confirm' && quote ? (
               <>
                 <h3>Confirm your ride</h3>
-                <TripChargePanel
-                  fare={quote.fare}
-                  distanceMiles={quote.route.distanceMiles}
-                  durationMinutes={quote.route.durationInTrafficMinutes ?? quote.route.durationMinutes}
-                />
+                <TripChargePanel fare={quote.fare} variant="summary" />
                 <div className={styles.quoteBox}>
                   <div className={styles.quoteRow}>
                     <span>Payment</span>
@@ -656,15 +662,31 @@ export default function BookingApp() {
             ) : step === 'success' && bookedRide ? (
               <div className={styles.success}>
                 <div className={styles.successIcon}>{bookedRide.status === 'cancelled' ? '✕' : '✓'}</div>
-                <h3>{bookedRide.status === 'cancelled' ? 'Ride cancelled' : 'Ride booked!'}</h3>
+                <h3>
+                  {bookedRide.status === 'cancelled'
+                    ? 'Ride cancelled'
+                    : bookedRide.status === 'completed'
+                      ? 'Trip completed'
+                      : 'Ride booked!'}
+                </h3>
                 <p>
                   {bookedRide.status === 'cancelled'
                     ? 'Your booking has been cancelled.'
-                    : `Your ${SERVICE_CATEGORIES[bookedRide.category].label} ride is confirmed.`}
+                    : bookedRide.status === 'completed'
+                      ? 'Thank you for riding with us. Here is your receipt.'
+                      : `Your ${SERVICE_CATEGORIES[bookedRide.category].label} ride is confirmed.`}
                 </p>
-                {bookedRide.status !== 'cancelled' && (
-                  <p className={styles.lockedFare}>Locked fare: {formatUSD(bookedRide.lockedFare)}</p>
-                )}
+
+                {bookedRide.status === 'completed' ? (
+                  <TripChargePanel fare={bookedRide.lockedFareBreakdown} variant="receipt" />
+                ) : bookedRide.status !== 'cancelled' ? (
+                  <>
+                    <TripChargePanel
+                      fare={{ ...bookedRide.lockedFareBreakdown, total: bookedRide.lockedFare }}
+                      variant="summary"
+                    />
+                  </>
+                ) : null}
                 {error && <p className={styles.error}>{error}</p>}
                 <div className={styles.btnRow}>
                   {bookedRide.status !== 'cancelled' && (
