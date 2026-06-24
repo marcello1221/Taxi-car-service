@@ -215,16 +215,25 @@ function round2(n: number) {
 }
 
 export function getAvailableRidesForDrivers(): RideForDriver[] {
-  return listRides({ forDrivers: true }).map((ride) => {
-    const rider = getUserById(ride.userId);
-    return {
-      ...ride,
-      rider: {
-        name: rider?.name ?? 'Rider',
-        phone: rider?.phone,
-      },
-    };
-  });
+  return listRides({ forDrivers: true }).map((ride) => ({
+    ...ride,
+    rider: { name: '', phone: undefined },
+  }));
+}
+
+export function getDriverAssignedRides(driverId: string): RideForDriver[] {
+  return listRides({ driverId, activeForDriver: true }).map(enrichRideForDriver);
+}
+
+function enrichRideForDriver(ride: Ride): RideForDriver {
+  const rider = getUserById(ride.userId);
+  return {
+    ...ride,
+    rider: {
+      name: rider?.name ?? 'Rider',
+      phone: rider?.phone,
+    },
+  };
 }
 
 export function getUserRides(userId: string) {

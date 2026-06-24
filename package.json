@@ -15,6 +15,7 @@
     "dev:user-app": "npm run start --workspace=apps/mobile-user",
     "dev:driver-app": "npm run start --workspace=apps/mobile-driver",
     "build:g63-apk": "npm run build:shared && cd apps/mobile-driver && npx expo prebuild --platform android && cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../../exports/G63.apk",
+    "build:driver-apk": "npm run build:shared && cd apps/mobile-driver && npx expo prebuild --platform android --clean && echo sdk.dir=$HOME/Library/Android/sdk > android/local.properties && cd android && ./gradlew clean assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../../../exports/driverapp.apk",
     "build": "npm run build --workspace=@taxi/shared && npm run build --workspaces --if-present",
     "build:shared": "npm run build --workspace=@taxi/shared",
     "build:api": "npm run build --workspace=@taxi/api",

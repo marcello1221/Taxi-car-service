@@ -14,6 +14,7 @@ import {
   cancelRide,
   completeRide,
   getAvailableRidesForDrivers,
+  getDriverAssignedRides,
   getUserRides,
   runEtaConfirmationJob,
 } from './services/rides';
@@ -171,6 +172,10 @@ app.get('/api/rides/user/:userId', (req, res) => {
 
 app.get('/api/rides/available', (_req, res) => {
   res.json(getAvailableRidesForDrivers());
+});
+
+app.get('/api/rides/driver/:driverId', (req, res) => {
+  res.json(getDriverAssignedRides(req.params.driverId));
 });
 
 app.get('/api/rides/:id/messages', (req, res) => {

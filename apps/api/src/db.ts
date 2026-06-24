@@ -247,14 +247,24 @@ export function getRideById(id: string): Ride | null {
   return row ? rowToRide(row) : null;
 }
 
-export function listRides(filters?: { userId?: string; status?: string; forDrivers?: boolean }): Ride[] {
+export function listRides(filters?: {
+  userId?: string;
+  driverId?: string;
+  status?: string;
+  forDrivers?: boolean;
+  activeForDriver?: boolean;
+}): Ride[] {
   let sql = 'SELECT * FROM rides WHERE 1=1';
   const params: unknown[] = [];
 
   if (filters?.userId) { sql += ' AND user_id = ?'; params.push(filters.userId); }
+  if (filters?.driverId) { sql += ' AND driver_id = ?'; params.push(filters.driverId); }
   if (filters?.status) { sql += ' AND status = ?'; params.push(filters.status); }
   if (filters?.forDrivers) {
     sql += " AND status IN ('confirmed', 'pending') AND driver_id IS NULL";
+  }
+  if (filters?.activeForDriver) {
+    sql += " AND driver_id IS NOT NULL AND status IN ('assigned', 'in_progress', 'awaiting_eta_approval')";
   }
 
   sql += ' ORDER BY scheduled_at ASC';
