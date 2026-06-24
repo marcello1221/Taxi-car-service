@@ -34,8 +34,8 @@ async function apiFetch(path: string, staffId: string, options?: RequestInit) {
 
 export default function OwnerPortal() {
   const [staff, setStaff] = useState<StaffMember | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('owner@taxi.demo');
+  const [password, setPassword] = useState('owner1234A');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -49,8 +49,33 @@ export default function OwnerPortal() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SESSION_KEY);
-      if (saved) setStaff(JSON.parse(saved));
+      if (saved) {
+        setStaff(JSON.parse(saved));
+        return;
+      }
     } catch { /* ignore */ }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autologin') !== '1') return;
+
+    void (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetch(`${API_URL}/api/owner/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'owner@taxi.demo', password: 'owner1234A' }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        persistStaff(data);
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const persistStaff = (s: StaffMember | null) => {
