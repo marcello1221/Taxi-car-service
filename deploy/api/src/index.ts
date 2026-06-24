@@ -17,6 +17,7 @@ import {
   getUserRides,
   runEtaConfirmationJob,
 } from './services/rides';
+import { getMessagesForRide, sendRideMessage } from './services/messages';
 import { geocodeAddress, autocompleteAddress, getPlaceDetails, reverseGeocode } from './services/maps';
 import { registerRider, authenticateRider, getUserById } from './services/auth';
 import { loginStaff, addStaffMember, getStaffList, changeStaffRole, removeStaffMember } from './services/staff';
@@ -172,6 +173,33 @@ app.get('/api/rides/available', (_req, res) => {
   res.json(getAvailableRidesForDrivers());
 });
 
+app.get('/api/rides/:id/messages', (req, res) => {
+  try {
+    res.json(getMessagesForRide(req.params.id));
+  } catch (err) {
+    res.status(404).json({ error: errorMessage(err) });
+  }
+});
+
+app.post('/api/rides/:id/messages', (req, res) => {
+  try {
+    const { senderId, senderRole, body } = req.body as {
+      senderId: string;
+      senderRole: 'driver' | 'rider';
+      body: string;
+    };
+    const message = sendRideMessage({
+      rideId: req.params.id,
+      senderId,
+      senderRole,
+      body,
+    });
+    res.status(201).json(message);
+  } catch (err) {
+    res.status(400).json({ error: errorMessage(err) });
+  }
+});
+
 app.get('/api/rides/:id', (req, res) => {
   const ride = getRideById(req.params.id);
   if (!ride) {
@@ -201,13 +229,13 @@ app.post('/api/rides/:id/cancel', (req, res) => {
 });
 
 app.post('/api/rides/:id/assign', (req, res) => {
-  const { driverId } = req.body as { driverId: string };
-  const ride = assignDriver(req.params.id, driverId);
-  if (!ride) {
-    res.status(404).json({ error: 'Ride not found' });
-    return;
+  try {
+    const { driverId } = req.body as { driverId: string };
+    const ride = assignDriver(req.params.id, driverId);
+    res.json(ride);
+  } catch (err) {
+    res.status(400).json({ error: errorMessage(err) });
   }
-  res.json(ride);
 });
 
 app.post('/api/rides/:id/complete', async (req, res) => {

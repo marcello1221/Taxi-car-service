@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import type { Ride, User, ServiceCategory, StaffMember, StaffRole, Expense } from '@taxi/shared';
+import type { Ride, User, ServiceCategory, StaffMember, StaffRole, Expense, RideMessage } from '@taxi/shared';
 
 const dbPath = process.env.DATABASE_PATH || (process.env.VERCEL ? '/tmp/taxi.db' : path.join(__dirname, '../data/taxi.db'));
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -72,6 +72,15 @@ db.exec(`
     created_by TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS ride_messages (
+    id TEXT PRIMARY KEY,
+    ride_id TEXT NOT NULL REFERENCES rides(id),
+    sender_id TEXT NOT NULL,
+    sender_role TEXT NOT NULL CHECK(sender_role IN ('driver', 'rider')),
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 const migrations = [
@@ -81,6 +90,7 @@ const migrations = [
   'ALTER TABLE rides ADD COLUMN driver_payout REAL',
   'ALTER TABLE rides ADD COLUMN platform_net REAL',
   'ALTER TABLE rides ADD COLUMN completed_at TEXT',
+  'ALTER TABLE rides ADD COLUMN note TEXT',
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch { /* exists */ }
@@ -188,8 +198,8 @@ export function createRide(ride: Ride): Ride {
       id, user_id, driver_id, category, pickup_json, dropoff_json, scheduled_at, status,
       locked_fare, locked_fare_breakdown_json, current_route_json, previous_eta_minutes,
       payment_provider, payment_intent_id, rider_charge, driver_payout, platform_net,
-      completed_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      note, completed_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     ride.id, ride.userId, ride.driverId ?? null, ride.category,
     JSON.stringify(ride.pickup), JSON.stringify(ride.dropoff),
@@ -199,6 +209,7 @@ export function createRide(ride: Ride): Ride {
     ride.previousEtaMinutes ?? null,
     ride.paymentProvider ?? null, ride.paymentIntentId ?? null,
     ride.riderCharge ?? null, ride.driverPayout ?? null, ride.platformNet ?? null,
+    ride.note ?? null,
     ride.completedAt ?? null, ride.createdAt, ride.updatedAt
   );
   return ride;
@@ -298,6 +309,7 @@ function rowToRide(row: Record<string, unknown>): Ride {
     riderCharge: row.rider_charge as number | undefined,
     driverPayout: row.driver_payout as number | undefined,
     platformNet: row.platform_net as number | undefined,
+    note: (row.note as string) || undefined,
     completedAt: (row.completed_at as string) || undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
@@ -436,6 +448,35 @@ export function listDriversWithUsers(): Array<{
     vehicleCategory: string;
     rating: number;
   }>;
+}
+
+/* ── Ride messages ── */
+
+export function listRideMessages(rideId: string): RideMessage[] {
+  return (db.prepare(`
+    SELECT * FROM ride_messages WHERE ride_id = ? ORDER BY created_at ASC
+  `).all(rideId) as Record<string, unknown>[]).map(rowToRideMessage);
+}
+
+export function createRideMessage(input: Omit<RideMessage, 'id' | 'createdAt'>): RideMessage {
+  const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const createdAt = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO ride_messages (id, ride_id, sender_id, sender_role, body, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, input.rideId, input.senderId, input.senderRole, input.body, createdAt);
+  return { ...input, id, createdAt };
+}
+
+function rowToRideMessage(row: Record<string, unknown>): RideMessage {
+  return {
+    id: row.id as string,
+    rideId: row.ride_id as string,
+    senderId: row.sender_id as string,
+    senderRole: row.sender_role as RideMessage['senderRole'],
+    body: row.body as string,
+    createdAt: row.created_at as string,
+  };
 }
 
 export { db };

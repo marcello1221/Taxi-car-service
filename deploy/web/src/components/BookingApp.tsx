@@ -62,6 +62,7 @@ export default function BookingApp() {
   const [pickup, setPickup] = useState<Address | null>(null);
   const [dropoff, setDropoff] = useState<Address | null>(null);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [riderNote, setRiderNote] = useState('');
   const [cardType, setCardType] = useState<CardType>('visa');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [liveQuote, setLiveQuote] = useState<Quote | null>(null);
@@ -381,6 +382,7 @@ export default function BookingApp() {
           dropoff,
           scheduledAt: new Date(scheduledAt).toISOString(),
           cardType,
+          note: riderNote.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -544,6 +546,16 @@ export default function BookingApp() {
                   <div className={styles.field}>
                     <label>Scheduled pickup</label>
                     <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label>Note for driver (optional)</label>
+                    <textarea
+                      value={riderNote}
+                      onChange={(e) => setRiderNote(e.target.value)}
+                      placeholder="Gate code, luggage, special instructions…"
+                      rows={3}
+                    />
                   </div>
 
                   <div className={styles.field}>

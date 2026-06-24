@@ -69,9 +69,28 @@ export interface Ride {
   riderCharge?: number;
   driverPayout?: number;
   platformNet?: number;
+  note?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RideRiderInfo {
+  name: string;
+  phone?: string;
+}
+
+export interface RideForDriver extends Ride {
+  rider: RideRiderInfo;
+}
+
+export interface RideMessage {
+  id: string;
+  rideId: string;
+  senderId: string;
+  senderRole: 'driver' | 'rider';
+  body: string;
+  createdAt: string;
 }
 
 export interface User {

@@ -9,12 +9,12 @@ import {
   type CardType,
   type PaymentProvider,
   type Ride,
+  type RideForDriver,
   type ServiceCategory,
 } from '@taxi/shared';
-import { createRide, updateRide, getRideById, listRides, getRidesNeedingEtaCheck } from '../db';
+import { createRide, updateRide, getRideById, listRides, getRidesNeedingEtaCheck, getUserById } from '../db';
 import { getRouteInfo, getRouteGeometry } from './maps';
 import { createPaymentIntent, capturePayment } from './payments';
-import { getUserById } from '../db';
 
 export async function quoteRide(
   category: ServiceCategory,
@@ -66,6 +66,7 @@ export async function bookRide(input: {
   scheduledAt: string;
   paymentProvider?: PaymentProvider;
   cardType: CardType;
+  note?: string;
 }) {
   const user = getUserById(input.userId);
   if (!user || user.role !== 'rider') {
@@ -104,6 +105,7 @@ export async function bookRide(input: {
     previousEtaMinutes: route.durationInTrafficMinutes ?? route.durationMinutes,
     paymentProvider: 'stripe',
     paymentIntentId: payment.intentId,
+    note: input.note?.trim() || undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -172,6 +174,13 @@ export function cancelRide(rideId: string) {
 }
 
 export function assignDriver(rideId: string, driverId: string) {
+  const ride = getRideById(rideId);
+  if (!ride) throw new Error('Ride not found');
+  if (ride.driverId) throw new Error('Ride already assigned to another driver');
+  if (ride.status === 'cancelled' || ride.status === 'completed') {
+    throw new Error('Ride is no longer available');
+  }
+
   return updateRide(rideId, { driverId, status: 'assigned' });
 }
 
@@ -205,8 +214,17 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-export function getAvailableRidesForDrivers() {
-  return listRides({ forDrivers: true });
+export function getAvailableRidesForDrivers(): RideForDriver[] {
+  return listRides({ forDrivers: true }).map((ride) => {
+    const rider = getUserById(ride.userId);
+    return {
+      ...ride,
+      rider: {
+        name: rider?.name ?? 'Rider',
+        phone: rider?.phone,
+      },
+    };
+  });
 }
 
 export function getUserRides(userId: string) {
