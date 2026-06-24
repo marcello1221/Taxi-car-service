@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import {
@@ -13,7 +14,10 @@ import {
   type User,
 } from '@taxi/shared';
 import AddressAutocomplete from './AddressAutocomplete';
+import TripChargePanel from './TripChargePanel';
 import styles from '../app/page.module.css';
+
+const BookingMap = dynamic(() => import('./BookingMap'), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxi-car-service-api.vercel.app';
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -22,7 +26,21 @@ const DEFAULT_LOCATION_BIAS = { lat: 40.7128, lng: -74.006 };
 
 type Quote = {
   route: { distanceMiles: number; durationMinutes: number; durationInTrafficMinutes?: number };
-  fare: { total: number; baseFare: number; mileageCharge: number; timeCharge: number };
+  fare: {
+    total: number;
+    baseFare: number;
+    mileageCharge: number;
+    timeCharge: number;
+    subtotal?: number;
+    tolls?: Array<{ id: string; name: string; amount: number }>;
+    tollTotal?: number;
+    companyNetFee?: number;
+    cityTax?: number;
+    blackCarFund?: number;
+    nycSurcharge?: number;
+    pickupBorough?: string;
+    dropoffBorough?: string;
+  };
 };
 
 type AuthMode = 'signup' | 'login';
@@ -45,6 +63,8 @@ export default function BookingApp() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [cardType, setCardType] = useState<CardType>('visa');
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [liveQuote, setLiveQuote] = useState<Quote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [bookedRide, setBookedRide] = useState<Ride | null>(null);
@@ -79,6 +99,44 @@ export default function BookingApp() {
     }, 10000);
     return () => clearInterval(interval);
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !pickup || !dropoff || step !== 'book') {
+      setLiveQuote(null);
+      return;
+    }
+
+    let cancelled = false;
+    setQuoteLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/rides/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            category,
+            pickup,
+            dropoff,
+            scheduledAt: new Date(scheduledAt).toISOString(),
+          }),
+        });
+        const data = await res.json();
+        if (!cancelled && res.ok) {
+          setLiveQuote(data);
+          setError('');
+        }
+      } catch {
+        if (!cancelled) setLiveQuote(null);
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [user, pickup, dropoff, category, scheduledAt, step]);
 
   const persistUser = (next: User | null) => {
     setUser(next);
@@ -273,6 +331,13 @@ export default function BookingApp() {
         setError('Set pickup and dropoff addresses — pick from the list or enter a full USA address');
         return;
       }
+
+      if (liveQuote) {
+        setQuote(liveQuote);
+        setStep('confirm');
+        return;
+      }
+
       const res = await fetch(`${API_URL}/api/rides/quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -389,7 +454,114 @@ export default function BookingApp() {
       )}
 
       <main className={styles.main}>
-        <section className={styles.hero} id="book">
+        <section className={user && step === 'book' ? styles.tripHero : styles.hero} id="book">
+          {user && step === 'book' ? (
+            <div className={styles.tripPlanner}>
+              <BookingMap center={nearbyBias} pickup={pickup} dropoff={dropoff} />
+
+              <div className={styles.tripTopPanel}>
+                <h3>Book your ride</h3>
+                <div className={styles.categoriesCompact}>
+                  {(Object.entries(SERVICE_CATEGORIES) as [ServiceCategory, typeof SERVICE_CATEGORIES.econom][]).map(
+                    ([key, cat]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`${styles.categoryBtn} ${category === key ? styles.categoryActive : ''}`}
+                        style={{ '--cat-accent': cat.accent } as React.CSSProperties}
+                        onClick={() => setCategory(key)}
+                      >
+                        {cat.label}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <div className={styles.addressGrid}>
+                  <div className={styles.field}>
+                    <label>Pickup</label>
+                    <div className={styles.inputRow}>
+                      <div className={styles.autocompleteWrap}>
+                        <AddressAutocomplete
+                          id="pickup-address"
+                          value={pickupText}
+                          onChange={handlePickupTextChange}
+                          onSelect={handlePickupSelect}
+                          onBlurFallback={(text) => geocodeField(text, 'pickup')}
+                          placeholder="Pickup address"
+                          isLoaded={isLoaded}
+                          locationBias={nearbyBias}
+                          inputClassName={styles.addressInput}
+                        />
+                      </div>
+                      <button type="button" onClick={() => detectLocation('pickup')} title="Use my location">📍</button>
+                    </div>
+                  </div>
+
+                  <div className={styles.field}>
+                    <label>Dropoff</label>
+                    <div className={styles.inputRow}>
+                      <div className={styles.autocompleteWrap}>
+                        <AddressAutocomplete
+                          id="dropoff-address"
+                          value={dropoffText}
+                          onChange={handleDropoffTextChange}
+                          onSelect={handleDropoffSelect}
+                          onBlurFallback={(text) => geocodeField(text, 'dropoff')}
+                          placeholder="Dropoff address"
+                          isLoaded={isLoaded}
+                          locationBias={nearbyBias}
+                          inputClassName={styles.addressInput}
+                        />
+                      </div>
+                      <button type="button" onClick={() => detectLocation('dropoff')} title="Use my location">📍</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.tripBottomPanel}>
+                <TripChargePanel
+                  fare={liveQuote?.fare ?? null}
+                  loading={quoteLoading}
+                  distanceMiles={liveQuote?.route.distanceMiles}
+                  durationMinutes={
+                    liveQuote?.route.durationInTrafficMinutes ?? liveQuote?.route.durationMinutes
+                  }
+                />
+
+                <div className={styles.tripBottomFields}>
+                  <div className={styles.field}>
+                    <label>Scheduled pickup</label>
+                    <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label>Payment card</label>
+                    <div className={styles.cardTypes}>
+                      {ACCEPTED_CARD_TYPES.map((card) => (
+                        <button
+                          key={card.id}
+                          type="button"
+                          className={`${styles.cardTypeBtn} ${cardType === card.id ? styles.cardTypeActive : ''}`}
+                          onClick={() => setCardType(card.id)}
+                        >
+                          {card.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {error && <p className={styles.error}>{error}</p>}
+
+                <button className={styles.btnPrimary} onClick={getQuote} disabled={loading || quoteLoading || !liveQuote}>
+                  {loading ? 'Calculating…' : 'Continue to payment'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
           <div className={styles.heroContent}>
             <span className={styles.badge}>Pre-book · Live ETA · Locked fares</span>
             <h2>Ride in style.<br />Book ahead.</h2>
@@ -457,114 +629,18 @@ export default function BookingApp() {
                   {loading ? 'Please wait…' : authMode === 'signup' ? 'Create account' : 'Sign in'}
                 </button>
               </>
-            ) : step === 'book' ? (
-              <>
-                <h3>Book your ride</h3>
-
-                <div className={styles.categories}>
-                  {(Object.entries(SERVICE_CATEGORIES) as [ServiceCategory, typeof SERVICE_CATEGORIES.econom][]).map(
-                    ([key, cat]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={`${styles.categoryBtn} ${category === key ? styles.categoryActive : ''}`}
-                        style={{ '--cat-accent': cat.accent } as React.CSSProperties}
-                        onClick={() => setCategory(key)}
-                      >
-                        <span className={styles.catLabel}>{cat.label}</span>
-                        <span className={styles.catDesc}>{cat.description}</span>
-                      </button>
-                    )
-                  )}
-                </div>
-
-                <div className={styles.field}>
-                  <label>Pickup address</label>
-                  <div className={styles.inputRow}>
-                    <div className={styles.autocompleteWrap}>
-                      <AddressAutocomplete
-                        id="pickup-address"
-                        value={pickupText}
-                        onChange={handlePickupTextChange}
-                        onSelect={handlePickupSelect}
-                        onBlurFallback={(text) => geocodeField(text, 'pickup')}
-                        placeholder="e.g. 350 5th Ave, New York, NY"
-                        isLoaded={isLoaded}
-                        locationBias={nearbyBias}
-                        inputClassName={styles.addressInput}
-                      />
-                    </div>
-                    <button type="button" onClick={() => detectLocation('pickup')} title="Use my location">📍</button>
-                  </div>
-                </div>
-
-                <div className={styles.field}>
-                  <label>Dropoff address</label>
-                  <div className={styles.inputRow}>
-                    <div className={styles.autocompleteWrap}>
-                      <AddressAutocomplete
-                        id="dropoff-address"
-                        value={dropoffText}
-                        onChange={handleDropoffTextChange}
-                        onSelect={handleDropoffSelect}
-                        onBlurFallback={(text) => geocodeField(text, 'dropoff')}
-                        placeholder="e.g. JFK Airport, Queens, NY"
-                        isLoaded={isLoaded}
-                        locationBias={nearbyBias}
-                        inputClassName={styles.addressInput}
-                      />
-                    </div>
-                    <button type="button" onClick={() => detectLocation('dropoff')} title="Use my location">📍</button>
-                  </div>
-                </div>
-
-                <div className={styles.field}>
-                  <label>Scheduled pickup</label>
-                  <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-                </div>
-
-                <div className={styles.field}>
-                  <label>Payment card</label>
-                  <p className={styles.cardHint}>We accept Visa, Mastercard, American Express, debit and credit cards.</p>
-                  <div className={styles.cardTypes}>
-                    {ACCEPTED_CARD_TYPES.map((card) => (
-                      <button
-                        key={card.id}
-                        type="button"
-                        className={`${styles.cardTypeBtn} ${cardType === card.id ? styles.cardTypeActive : ''}`}
-                        onClick={() => setCardType(card.id)}
-                      >
-                        {card.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {error && <p className={styles.error}>{error}</p>}
-
-                <button className={styles.btnPrimary} onClick={getQuote} disabled={loading}>
-                  {loading ? 'Calculating…' : 'Get live quote'}
-                </button>
-              </>
             ) : step === 'confirm' && quote ? (
               <>
                 <h3>Confirm your ride</h3>
+                <TripChargePanel
+                  fare={quote.fare}
+                  distanceMiles={quote.route.distanceMiles}
+                  durationMinutes={quote.route.durationInTrafficMinutes ?? quote.route.durationMinutes}
+                />
                 <div className={styles.quoteBox}>
-                  <div className={styles.quoteRow}>
-                    <span>Distance</span>
-                    <span>{quote.route.distanceMiles} mi</span>
-                  </div>
-                  <div className={styles.quoteRow}>
-                    <span>ETA (traffic)</span>
-                    <span>{Math.round(quote.route.durationInTrafficMinutes ?? quote.route.durationMinutes)} min</span>
-                  </div>
                   <div className={styles.quoteRow}>
                     <span>Payment</span>
                     <span>{cardLabel}</span>
-                  </div>
-                  <div className={`${styles.quoteRow} ${styles.quoteTotal}`}>
-                    <span>Locked fare</span>
-                    <span>{formatUSD(quote.fare.total)}</span>
                   </div>
                 </div>
                 <p className={styles.fareNote}>
@@ -607,6 +683,8 @@ export default function BookingApp() {
               </div>
             ) : null}
           </div>
+            </>
+          )}
         </section>
 
         <section className={styles.services} id="services">

@@ -1,9 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SERVICE_CATEGORIES = void 0;
+exports.PAYMENT_FEE_RATES = exports.SERVICE_CATEGORIES = void 0;
 exports.calculateFare = calculateFare;
 exports.getRiderCharge = getRiderCharge;
-exports.PAYMENT_FEE_RATES = void 0;
 exports.splitRiderPayment = splitRiderPayment;
 exports.shouldKeepLockedFare = shouldKeepLockedFare;
 exports.round2 = round2;
@@ -60,7 +59,7 @@ function getRiderCharge(lockedFare) {
 /** Percentages deducted from total rider payment before driver net income. */
 exports.PAYMENT_FEE_RATES = {
     companyNet: 0.15,
-    cityTax: 0.0878,
+    cityTax: 0.08875,
     blackCarFund: 0.015,
     nycSurcharge: 0.005,
     govFee: 0.18,

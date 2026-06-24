@@ -109,6 +109,90 @@
   margin-bottom: 3rem;
 }
 
+.tripHero {
+  margin-bottom: 3rem;
+}
+
+.tripPlanner {
+  position: relative;
+  min-height: 720px;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-glow);
+}
+
+.tripTopPanel {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 2;
+  padding: 1rem 1.1rem;
+  background: rgba(10, 14, 23, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+}
+
+.tripTopPanel h3 {
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+}
+
+.tripBottomPanel {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+.tripBottomFields {
+  padding: 1rem 1.1rem;
+  background: rgba(10, 14, 23, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+}
+
+.categoriesCompact {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.categoriesCompact .categoryBtn {
+  min-width: 88px;
+  padding: 0.55rem 0.8rem;
+  align-items: center;
+}
+
+.addressGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .tripPlanner {
+    min-height: 860px;
+  }
+
+  .tripBottomPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .addressGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;

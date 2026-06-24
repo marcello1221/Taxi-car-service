@@ -313,3 +313,28 @@ export async function getPlaceDetails(
     placeId: result.place_id,
   };
 }
+
+export async function getRouteGeometry(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number }
+): Promise<Array<{ lat: number; lng: number }> | null> {
+  try {
+    const url =
+      `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};` +
+      `${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'TaxiCarService/1.0 (https://taxi-car-service.vercel.app)' },
+    });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as {
+      routes?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
+    };
+    const coordinates = data.routes?.[0]?.geometry?.coordinates;
+    if (!coordinates?.length) return null;
+
+    return coordinates.map(([lng, lat]) => ({ lat, lng }));
+  } catch {
+    return null;
+  }
+}

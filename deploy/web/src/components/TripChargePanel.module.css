@@ -1,0 +1,59 @@
+.chargePanel {
+  background: rgba(10, 14, 23, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  backdrop-filter: blur(16px);
+}
+
+.chargePanel h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  color: #c5cce0;
+  font-size: 0.82rem;
+}
+
+.row strong {
+  color: #f0f4ff;
+  font-weight: 600;
+}
+
+.sectionLabel {
+  margin-top: 0.65rem;
+  margin-bottom: 0.25rem;
+  color: #8b95b5;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #00d4aa;
+}
+
+.placeholder {
+  color: #8b95b5;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.boroughs {
+  margin-top: 0.5rem;
+  color: #8b95b5;
+  font-size: 0.75rem;
+}

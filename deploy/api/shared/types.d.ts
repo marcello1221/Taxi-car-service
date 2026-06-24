@@ -16,9 +16,22 @@ export interface FareBreakdown {
     baseFare: number;
     mileageCharge: number;
     timeCharge: number;
+    subtotal?: number;
+    tolls?: Array<{
+        id: string;
+        name: string;
+        amount: number;
+    }>;
+    tollTotal?: number;
+    companyNetFee?: number;
+    cityTax?: number;
+    blackCarFund?: number;
+    nycSurcharge?: number;
     total: number;
     distanceMiles: number;
     durationMinutes: number;
+    pickupBorough?: string;
+    dropoffBorough?: string;
 }
 export interface RouteInfo {
     distanceMiles: number;

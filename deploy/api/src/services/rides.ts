@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
   calculateFare,
+  calculateTripCharges,
   shouldKeepLockedFare,
   splitRiderPayment,
   getRiderCharge,
@@ -11,7 +12,7 @@ import {
   type ServiceCategory,
 } from '@taxi/shared';
 import { createRide, updateRide, getRideById, listRides, getRidesNeedingEtaCheck } from '../db';
-import { getRouteInfo } from './maps';
+import { getRouteInfo, getRouteGeometry } from './maps';
 import { createPaymentIntent, capturePayment } from './payments';
 import { getUserById } from '../db';
 
@@ -23,8 +24,38 @@ export async function quoteRide(
 ) {
   const departure = new Date(scheduledAt);
   const route = await getRouteInfo(pickup, dropoff, departure);
-  const fare = calculateFare(category, route);
-  return { route, fare, category };
+  const routePoints = await getRouteGeometry(pickup, dropoff);
+  const baseFare = calculateFare(category, route);
+  const charges = calculateTripCharges({
+    baseFare: baseFare.baseFare,
+    mileageCharge: baseFare.mileageCharge,
+    timeCharge: baseFare.timeCharge,
+    distanceMiles: baseFare.distanceMiles,
+    durationMinutes: baseFare.durationMinutes,
+    pickup,
+    dropoff,
+    routePoints: routePoints ?? undefined,
+  });
+
+  const fare = {
+    baseFare: charges.baseFare,
+    mileageCharge: charges.mileageCharge,
+    timeCharge: charges.timeCharge,
+    subtotal: charges.subtotal,
+    tolls: charges.tolls,
+    tollTotal: charges.tollTotal,
+    companyNetFee: charges.companyNetFee,
+    cityTax: charges.cityTax,
+    blackCarFund: charges.blackCarFund,
+    nycSurcharge: charges.nycSurcharge,
+    total: charges.total,
+    distanceMiles: charges.distanceMiles,
+    durationMinutes: charges.durationMinutes,
+    pickupBorough: charges.pickupBorough,
+    dropoffBorough: charges.dropoffBorough,
+  };
+
+  return { route, fare, category, charges };
 }
 
 export async function bookRide(input: {

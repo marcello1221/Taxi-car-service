@@ -73,7 +73,7 @@ export function getRiderCharge(lockedFare: number): number {
 /** Percentages deducted from total rider payment before driver net income. */
 export const PAYMENT_FEE_RATES = {
   companyNet: 0.15,
-  cityTax: 0.0878,
+  cityTax: 0.08875,
   blackCarFund: 0.015,
   nycSurcharge: 0.005,
   govFee: 0.18,
