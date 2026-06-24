@@ -5,13 +5,20 @@ import type { Address } from '@taxi/shared';
 import styles from './AddressAutocomplete.module.css';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxi-car-service-api.vercel.app';
-const MIN_CHARS = 3;
+const MIN_CHARS = 2;
+const DEBOUNCE_MS = 200;
+const BIAS_RADIUS_METERS = 50000;
 
 export interface PlaceSuggestion {
   placeId: string;
   main: string;
   secondary: string;
   description: string;
+}
+
+interface LocationBias {
+  lat: number;
+  lng: number;
 }
 
 interface AddressAutocompleteProps {
@@ -21,6 +28,7 @@ interface AddressAutocompleteProps {
   onBlurFallback?: (text: string) => void;
   placeholder: string;
   isLoaded: boolean;
+  locationBias?: LocationBias | null;
   inputClassName?: string;
   id?: string;
 }
@@ -40,6 +48,15 @@ function hasGooglePlaces(): boolean {
   return typeof window !== 'undefined' && Boolean(window.google?.maps?.places);
 }
 
+function buildAutocompleteUrl(input: string, locationBias?: LocationBias | null): string {
+  const params = new URLSearchParams({ input });
+  if (locationBias) {
+    params.set('lat', String(locationBias.lat));
+    params.set('lng', String(locationBias.lng));
+  }
+  return `${API_URL}/api/places/autocomplete?${params}`;
+}
+
 export default function AddressAutocomplete({
   value,
   onChange,
@@ -47,6 +64,7 @@ export default function AddressAutocomplete({
   onBlurFallback,
   placeholder,
   isLoaded,
+  locationBias,
   inputClassName,
   id,
 }: AddressAutocompleteProps) {
@@ -55,7 +73,8 @@ export default function AddressAutocomplete({
   const serviceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesRef = useRef<google.maps.places.PlacesService | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const skipFetchRef = useRef(false);
+  const requestIdRef = useRef(0);
+  const pickingRef = useRef(false);
 
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -72,53 +91,73 @@ export default function AddressAutocomplete({
     return true;
   }, []);
 
-  const fetchFromApi = useCallback(async (input: string) => {
-    const res = await fetch(`${API_URL}/api/places/autocomplete?input=${encodeURIComponent(input)}`);
+  const fetchFromApi = useCallback(async (input: string, bias?: LocationBias | null) => {
+    const res = await fetch(buildAutocompleteUrl(input, bias));
     if (!res.ok) return [];
     return (await res.json()) as PlaceSuggestion[];
   }, []);
 
   const applySuggestions = useCallback((items: PlaceSuggestion[]) => {
     setSuggestions(items);
-    setOpen(items.length > 0);
+    setOpen(true);
     setActiveIndex(-1);
   }, []);
 
   const loadSuggestions = useCallback(
-    async (input: string) => {
+    async (input: string, bias?: LocationBias | null) => {
       const trimmed = input.trim();
       if (trimmed.length < MIN_CHARS) {
         setSuggestions([]);
         setOpen(false);
         setActiveIndex(-1);
         setLoading(false);
+        setSearchAttempted(false);
         return;
       }
 
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setSearchAttempted(true);
+      setOpen(true);
+
+      const predictionRequest: google.maps.places.AutocompletionRequest = {
+        input: trimmed,
+        componentRestrictions: { country: 'us' },
+      };
+
+      if (bias) {
+        predictionRequest.location = new google.maps.LatLng(bias.lat, bias.lng);
+        predictionRequest.radius = BIAS_RADIUS_METERS;
+      }
 
       if (isLoaded && ensureGoogleServices() && serviceRef.current) {
-        serviceRef.current.getPlacePredictions(
-          { input: trimmed, componentRestrictions: { country: 'us' } },
-          (predictions, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
-              applySuggestions(predictionsToSuggestions(predictions));
-              setLoading(false);
-              return;
-            }
-            void fetchFromApi(trimmed)
-              .then(applySuggestions)
-              .finally(() => setLoading(false));
+        serviceRef.current.getPlacePredictions(predictionRequest, (predictions, status) => {
+          if (requestId !== requestIdRef.current) return;
+
+          if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
+            applySuggestions(predictionsToSuggestions(predictions));
+            setLoading(false);
+            return;
           }
-        );
+
+          void fetchFromApi(trimmed, bias)
+            .then((items) => {
+              if (requestId !== requestIdRef.current) return;
+              applySuggestions(items);
+            })
+            .finally(() => {
+              if (requestId === requestIdRef.current) setLoading(false);
+            });
+        });
         return;
       }
 
       try {
-        applySuggestions(await fetchFromApi(trimmed));
+        const items = await fetchFromApi(trimmed, bias);
+        if (requestId !== requestIdRef.current) return;
+        applySuggestions(items);
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
     },
     [applySuggestions, ensureGoogleServices, fetchFromApi, isLoaded]
@@ -163,35 +202,59 @@ export default function AddressAutocomplete({
 
   const pickSuggestion = useCallback(
     async (suggestion: PlaceSuggestion) => {
-      skipFetchRef.current = true;
+      pickingRef.current = true;
+      requestIdRef.current += 1;
       setOpen(false);
       setSuggestions([]);
       setActiveIndex(-1);
+      setLoading(false);
       onChange(suggestion.description);
 
-      const address = await resolveSuggestion(suggestion);
-      if (address) {
-        onChange(address.formatted);
-        onSelect(address);
-        return;
+      try {
+        const address = await resolveSuggestion(suggestion);
+        if (address) {
+          onChange(address.formatted);
+          onSelect(address);
+          return;
+        }
+        onBlurFallback?.(suggestion.description);
+      } finally {
+        window.setTimeout(() => {
+          pickingRef.current = false;
+        }, 250);
       }
-      onBlurFallback?.(suggestion.description);
     },
     [onBlurFallback, onChange, onSelect, resolveSuggestion]
   );
 
+  const queueSearch = useCallback(
+    (text: string) => {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void loadSuggestions(text, locationBias);
+      }, DEBOUNCE_MS);
+    },
+    [loadSuggestions, locationBias]
+  );
+
   const handleInputChange = (text: string) => {
-    skipFetchRef.current = false;
     onChange(text);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      void loadSuggestions(text);
-    }, 280);
+    queueSearch(text);
+  };
+
+  const handleFocus = () => {
+    if (value.trim().length >= MIN_CHARS) {
+      setOpen(true);
+      if (suggestions.length === 0 && !loading) {
+        queueSearch(value);
+      }
+    }
   };
 
   const handleBlur = () => {
     window.setTimeout(() => {
       setOpen(false);
+      if (pickingRef.current) return;
       if (value.trim() && onBlurFallback) {
         onBlurFallback(value.trim());
       }
@@ -199,15 +262,15 @@ export default function AddressAutocomplete({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open || suggestions.length === 0) return;
+    if (!open) return;
 
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' && suggestions.length > 0) {
       e.preventDefault();
       setActiveIndex((i) => (i + 1) % suggestions.length);
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp' && suggestions.length > 0) {
       e.preventDefault();
       setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
+    } else if (e.key === 'Enter' && activeIndex >= 0 && suggestions.length > 0) {
       e.preventDefault();
       void pickSuggestion(suggestions[activeIndex]);
     } else if (e.key === 'Escape') {
@@ -226,6 +289,12 @@ export default function AddressAutocomplete({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  const showPanel = open && value.trim().length >= MIN_CHARS;
+
   return (
     <div className={styles.wrap} ref={wrapRef}>
       <input
@@ -233,11 +302,11 @@ export default function AddressAutocomplete({
         type="text"
         role="combobox"
         aria-autocomplete="list"
-        aria-expanded={open}
+        aria-expanded={showPanel}
         aria-controls={listId}
         value={value}
         onChange={(e) => handleInputChange(e.target.value)}
-        onFocus={() => value.trim().length >= MIN_CHARS && suggestions.length > 0 && setOpen(true)}
+        onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -245,8 +314,14 @@ export default function AddressAutocomplete({
         autoComplete="off"
       />
 
-      {open && suggestions.length > 0 && (
+      {showPanel && (
         <ul id={listId} className={styles.suggestions} role="listbox">
+          {loading && suggestions.length === 0 && (
+            <li className={styles.status} role="presentation">
+              Searching nearby addresses…
+            </li>
+          )}
+
           {suggestions.map((suggestion, index) => (
             <li key={suggestion.placeId} role="option" aria-selected={index === activeIndex}>
               <button
@@ -265,15 +340,13 @@ export default function AddressAutocomplete({
               </button>
             </li>
           ))}
+
+          {!loading && searchAttempted && suggestions.length === 0 && (
+            <li className={styles.status} role="presentation">
+              No nearby matches — keep typing or press Tab to geocode on blur.
+            </li>
+          )}
         </ul>
-      )}
-
-      {loading && value.trim().length >= MIN_CHARS && !open && (
-        <div className={styles.hint}>Finding addresses…</div>
-      )}
-
-      {!loading && searchAttempted && value.trim().length >= MIN_CHARS && !open && suggestions.length === 0 && (
-        <div className={styles.hint}>No suggestions — check spelling or press Tab to geocode on blur.</div>
       )}
     </div>
   );

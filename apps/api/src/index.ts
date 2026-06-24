@@ -16,7 +16,7 @@ import {
   getUserRides,
   runEtaConfirmationJob,
 } from './services/rides';
-import { geocodeAddress, autocompleteAddress, getPlaceDetails } from './services/maps';
+import { geocodeAddress, autocompleteAddress, getPlaceDetails, reverseGeocode } from './services/maps';
 import { registerRider, authenticateRider, getUserById } from './services/auth';
 import { loginStaff, addStaffMember, getStaffList, changeStaffRole, removeStaffMember } from './services/staff';
 import { buildBusinessReport, addExpense, getDriversOverview } from './services/reports';
@@ -114,9 +114,23 @@ app.post('/api/geocode', async (req, res) => {
   res.json(result);
 });
 
+app.get('/api/geocode/reverse', async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  const result = await reverseGeocode(lat, lng);
+  if (!result) {
+    res.status(404).json({ error: 'Address not found at this location' });
+    return;
+  }
+  res.json(result);
+});
+
 app.get('/api/places/autocomplete', async (req, res) => {
   const input = String(req.query.input || '');
-  const suggestions = await autocompleteAddress(input);
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  const location = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+  const suggestions = await autocompleteAddress(input, location);
   res.json(suggestions);
 });
 

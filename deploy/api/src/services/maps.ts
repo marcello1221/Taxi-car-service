@@ -88,27 +88,82 @@ function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
+const NOMINATIM_HEADERS = { 'User-Agent': 'TaxiCarService/1.0 (https://taxi-car-service.vercel.app)' };
+
+export async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<{ lat: number; lng: number; formatted: string } | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  try {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lng),
+      format: 'json',
+    });
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
+      headers: NOMINATIM_HEADERS,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { display_name?: string };
+    if (!data.display_name) return null;
+    return { lat, lng, formatted: data.display_name };
+  } catch {
+    return null;
+  }
+}
+
+async function geocodeWithNominatim(
+  address: string
+): Promise<{ lat: number; lng: number; formatted: string } | null> {
+  try {
+    const params = new URLSearchParams({
+      q: address.trim(),
+      format: 'json',
+      limit: '1',
+      countrycodes: 'us',
+    });
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+      headers: NOMINATIM_HEADERS,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Array<{ lat: string; lon: string; display_name: string }>;
+    const hit = data[0];
+    if (!hit) return null;
+    return {
+      lat: Number(hit.lat),
+      lng: Number(hit.lon),
+      formatted: hit.display_name,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; formatted: string } | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return null;
+  if (apiKey) {
+    const params = new URLSearchParams({
+      address,
+      components: 'country:US',
+      key: apiKey,
+    });
 
-  const params = new URLSearchParams({
-    address,
-    components: 'country:US',
-    key: apiKey,
-  });
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
+    const data = await res.json() as { results: Array<{ formatted_address: string; geometry: { location: { lat: number; lng: number } } }> };
 
-  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
-  const data = await res.json() as { results: Array<{ formatted_address: string; geometry: { location: { lat: number; lng: number } } }> };
+    const result = data.results[0];
+    if (result) {
+      return {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+        formatted: result.formatted_address,
+      };
+    }
+  }
 
-  const result = data.results[0];
-  if (!result) return null;
-
-  return {
-    lat: result.geometry.location.lat,
-    lng: result.geometry.location.lng,
-    formatted: result.formatted_address,
-  };
+  return geocodeWithNominatim(address);
 }
 
 export interface PlaceSuggestion {
@@ -118,15 +173,30 @@ export interface PlaceSuggestion {
   description: string;
 }
 
-export async function autocompleteAddress(input: string): Promise<PlaceSuggestion[]> {
+const AUTOCOMPLETE_BIAS_RADIUS = 50000;
+
+export async function autocompleteAddress(
+  input: string,
+  location?: { lat: number; lng: number }
+): Promise<PlaceSuggestion[]> {
+  const trimmed = input.trim();
+  if (trimmed.length < 2) return [];
+
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey || input.trim().length < 3) return [];
+  if (!apiKey) {
+    return searchPlacesNominatim(trimmed, location);
+  }
 
   const params = new URLSearchParams({
-    input: input.trim(),
+    input: trimmed,
     components: 'country:us',
     key: apiKey,
   });
+
+  if (location && Number.isFinite(location.lat) && Number.isFinite(location.lng)) {
+    params.set('location', `${location.lat},${location.lng}`);
+    params.set('radius', String(AUTOCOMPLETE_BIAS_RADIUS));
+  }
 
   const res = await fetch(`https://maps.googleapis.com/maps/api/place/autocomplete/json?${params}`);
   const data = await res.json() as {
@@ -138,7 +208,9 @@ export async function autocompleteAddress(input: string): Promise<PlaceSuggestio
     }>;
   };
 
-  if (data.status !== 'OK' || !data.predictions) return [];
+  if (data.status !== 'OK' || !data.predictions) {
+    return searchPlacesNominatim(input.trim(), location);
+  }
 
   return data.predictions.map((p) => ({
     placeId: p.place_id,
@@ -148,9 +220,71 @@ export async function autocompleteAddress(input: string): Promise<PlaceSuggestio
   }));
 }
 
+async function searchPlacesNominatim(
+  input: string,
+  location?: { lat: number; lng: number }
+): Promise<PlaceSuggestion[]> {
+  try {
+    const params = new URLSearchParams({
+      q: input,
+      format: 'json',
+      limit: '6',
+      countrycodes: 'us',
+      addressdetails: '1',
+    });
+
+    if (location && Number.isFinite(location.lat) && Number.isFinite(location.lng)) {
+      const delta = 0.35;
+      const left = location.lng - delta;
+      const right = location.lng + delta;
+      const top = location.lat + delta;
+      const bottom = location.lat - delta;
+      params.set('viewbox', `${left},${top},${right},${bottom}`);
+      params.set('bounded', '1');
+    }
+
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+      headers: NOMINATIM_HEADERS,
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as Array<{
+      place_id: number;
+      lat: string;
+      lon: string;
+      display_name: string;
+      name?: string;
+    }>;
+
+    return data.map((item) => {
+      const parts = item.display_name.split(',').map((part) => part.trim());
+      const main = item.name || parts[0] || item.display_name;
+      const secondary = parts.slice(1).join(', ');
+      return {
+        placeId: `nominatim:${item.lat}:${item.lon}`,
+        main,
+        secondary,
+        description: item.display_name,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 export async function getPlaceDetails(
   placeId: string
 ): Promise<{ lat: number; lng: number; formatted: string; placeId: string } | null> {
+  if (placeId.startsWith('nominatim:')) {
+    const [, latStr, lngStr] = placeId.split(':');
+    const lat = Number(latStr);
+    const lng = Number(lngStr);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const reversed = await reverseGeocode(lat, lng);
+    if (!reversed) return { lat, lng, formatted: `${lat}, ${lng}`, placeId };
+    return { ...reversed, placeId };
+  }
+
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey || !placeId) return null;
 

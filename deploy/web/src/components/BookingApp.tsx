@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import {
@@ -13,11 +14,15 @@ import {
   type User,
 } from '@taxi/shared';
 import AddressAutocomplete from './AddressAutocomplete';
+import type { MapTarget } from './BookingMap';
 import styles from '../app/page.module.css';
+
+const BookingMap = dynamic(() => import('./BookingMap'), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxi-car-service-api.vercel.app';
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const AUTH_KEY = 'taxi_rider_session';
+const DEFAULT_LOCATION_BIAS = { lat: 40.7128, lng: -74.006 };
 
 type Quote = {
   route: { distanceMiles: number; durationMinutes: number; durationInTrafficMinutes?: number };
@@ -48,6 +53,8 @@ export default function BookingApp() {
   const [error, setError] = useState('');
   const [bookedRide, setBookedRide] = useState<Ride | null>(null);
   const [pendingApproval, setPendingApproval] = useState<Ride | null>(null);
+  const [nearbyBias, setNearbyBias] = useState(DEFAULT_LOCATION_BIAS);
+  const [mapTarget, setMapTarget] = useState<MapTarget>('pickup');
 
   useEffect(() => {
     const minDate = new Date(Date.now() + 15 * 60000);
@@ -56,6 +63,13 @@ export default function BookingApp() {
       const saved = localStorage.getItem(AUTH_KEY);
       if (saved) setUser(JSON.parse(saved));
     } catch { /* ignore */ }
+
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setNearbyBias({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => { /* keep NYC default */ },
+      { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 }
+    );
   }, []);
 
   useEffect(() => {
@@ -133,43 +147,131 @@ export default function BookingApp() {
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-      const formatted = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      const addr: Address = { formatted, lat, lng };
+      setNearbyBias({ lat, lng });
+
+      let addr: Address = { formatted: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, lat, lng };
+      try {
+        const res = await fetch(`${API_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+        if (res.ok) {
+          addr = { formatted: data.formatted, lat: data.lat, lng: data.lng };
+        }
+      } catch { /* keep coordinates */ }
+
       if (target === 'pickup') {
         setPickup(addr);
-        setPickupText(formatted);
+        setPickupText(addr.formatted);
+        setMapTarget('dropoff');
       } else {
         setDropoff(addr);
-        setDropoffText(formatted);
+        setDropoffText(addr.formatted);
       }
+      setError('');
     }, () => setError('Location permission denied'));
   }, []);
 
-  const geocodeField = async (text: string, target: 'pickup' | 'dropoff') => {
-    if (!text.trim()) return;
-    setLoading(true);
+  const applyAddressToField = useCallback((target: MapTarget, address: Address) => {
+    if (target === 'pickup') {
+      setPickup(address);
+      setPickupText(address.formatted);
+      setMapTarget('dropoff');
+      return;
+    }
+    setDropoff(address);
+    setDropoffText(address.formatted);
+  }, []);
+
+  const handleMapClick = useCallback(
+    async (lat: number, lng: number) => {
+      try {
+        const res = await fetch(`${API_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Address not found');
+        applyAddressToField(mapTarget, {
+          formatted: data.formatted,
+          lat: data.lat,
+          lng: data.lng,
+        });
+        setError('');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not detect address on map');
+      }
+    },
+    [applyAddressToField, mapTarget]
+  );
+
+  const geocodeText = useCallback(async (text: string): Promise<Address | null> => {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+
+    const parts = trimmed.split(',').map((part) => Number(part.trim()));
+    if (parts.length === 2 && !Number.isNaN(parts[0]) && !Number.isNaN(parts[1])) {
+      return { formatted: trimmed, lat: parts[0], lng: parts[1] };
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/geocode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: text }),
+        body: JSON.stringify({ address: trimmed }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      const addr: Address = { formatted: data.formatted, lat: data.lat, lng: data.lng };
-      if (target === 'pickup') setPickup(addr);
-      else setDropoff(addr);
-    } catch (err) {
-      const parts = text.split(',').map(Number);
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        const addr: Address = { formatted: text, lat: parts[0], lng: parts[1] };
-        if (target === 'pickup') setPickup(addr);
-        else setDropoff(addr);
-      } else {
-        setError(String(err));
+      if (!res.ok) return null;
+      return { formatted: data.formatted, lat: data.lat, lng: data.lng };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const resolveAddressField = useCallback(
+    async (
+      text: string,
+      current: Address | null,
+      setText: (value: string) => void,
+      setAddr: (value: Address | null) => void
+    ): Promise<Address | null> => {
+      const trimmed = text.trim();
+      if (!trimmed) return null;
+      if (current && current.formatted.trim() === trimmed) return current;
+
+      const resolved = await geocodeText(trimmed);
+      if (resolved) {
+        setAddr(resolved);
+        setText(resolved.formatted);
+      }
+      return resolved;
+    },
+    [geocodeText]
+  );
+
+  const geocodeField = async (text: string, target: 'pickup' | 'dropoff') => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      const setText = target === 'pickup' ? setPickupText : setDropoffText;
+      const setAddr = target === 'pickup' ? setPickup : setDropoff;
+      const current = target === 'pickup' ? pickup : dropoff;
+      const resolved = await resolveAddressField(text, current, setText, setAddr);
+      if (!resolved) {
+        setError(`Could not find ${target} address — pick a suggestion or check spelling`);
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePickupTextChange = (text: string) => {
+    setPickupText(text);
+    if (pickup && text.trim() !== pickup.formatted.trim()) {
+      setPickup(null);
+    }
+  };
+
+  const handleDropoffTextChange = (text: string) => {
+    setDropoffText(text);
+    if (dropoff && text.trim() !== dropoff.formatted.trim()) {
+      setDropoff(null);
     }
   };
 
@@ -178,17 +280,34 @@ export default function BookingApp() {
       setError('Please sign up or sign in to book');
       return;
     }
-    if (!pickup || !dropoff) {
-      setError('Set pickup and dropoff addresses');
-      return;
-    }
     setLoading(true);
     setError('');
     try {
+      const resolvedPickup = await resolveAddressField(
+        pickupText,
+        pickup,
+        setPickupText,
+        setPickup
+      );
+      const resolvedDropoff = await resolveAddressField(
+        dropoffText,
+        dropoff,
+        setDropoffText,
+        setDropoff
+      );
+      if (!resolvedPickup || !resolvedDropoff) {
+        setError('Set pickup and dropoff addresses — pick from the list or enter a full USA address');
+        return;
+      }
       const res = await fetch(`${API_URL}/api/rides/quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, pickup, dropoff, scheduledAt: new Date(scheduledAt).toISOString() }),
+        body: JSON.stringify({
+          category,
+          pickup: resolvedPickup,
+          dropoff: resolvedDropoff,
+          scheduledAt: new Date(scheduledAt).toISOString(),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -288,7 +407,23 @@ export default function BookingApp() {
             <p>Choose Econom, Lux, or Lux SUV. Sign up to book. We lock your fare at booking and confirm traffic 10 minutes before pickup.</p>
           </div>
 
-          <div className={styles.bookingCard}>
+          <div
+            className={`${styles.bookingShell} ${user && step === 'book' ? styles.bookingShellWithMap : ''}`}
+          >
+            {user && step === 'book' && (
+              <BookingMap
+                center={nearbyBias}
+                pickup={pickup}
+                dropoff={dropoff}
+                mapTarget={mapTarget}
+                onMapTargetChange={setMapTarget}
+                onMapClick={handleMapClick}
+              />
+            )}
+
+            <div
+              className={`${styles.bookingCard} ${user && step === 'book' ? styles.bookingCardOnMap : ''}`}
+            >
             {!user ? (
               <>
                 <h3>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h3>
@@ -372,7 +507,7 @@ export default function BookingApp() {
 
                 <div className={styles.field}>
                   <label>Pickup address</label>
-                  <p className={styles.fieldHint}>Type at least 3 characters for USA address suggestions</p>
+                  <p className={styles.fieldHint}>Type or click the map behind this form to set pickup</p>
                   {!MAPS_KEY && (
                     <p className={styles.fieldHint}>Tip: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel for faster search.</p>
                   )}
@@ -381,11 +516,15 @@ export default function BookingApp() {
                       <AddressAutocomplete
                         id="pickup-address"
                         value={pickupText}
-                        onChange={setPickupText}
-                        onSelect={(addr) => setPickup(addr)}
+                        onChange={handlePickupTextChange}
+                        onSelect={(addr) => {
+                          setPickup(addr);
+                          setMapTarget('dropoff');
+                        }}
                         onBlurFallback={(text) => geocodeField(text, 'pickup')}
                         placeholder="e.g. 350 5th Ave, New York, NY"
                         isLoaded={isLoaded}
+                        locationBias={nearbyBias}
                         inputClassName={styles.addressInput}
                       />
                     </div>
@@ -395,7 +534,7 @@ export default function BookingApp() {
 
                 <div className={styles.field}>
                   <label>Dropoff address</label>
-                  <p className={styles.fieldHint}>Type at least 3 characters for USA address suggestions</p>
+                  <p className={styles.fieldHint}>Type or click the map behind this form to set dropoff</p>
                   {!MAPS_KEY && (
                     <p className={styles.fieldHint}>Tip: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel for faster search.</p>
                   )}
@@ -404,11 +543,12 @@ export default function BookingApp() {
                       <AddressAutocomplete
                         id="dropoff-address"
                         value={dropoffText}
-                        onChange={setDropoffText}
+                        onChange={handleDropoffTextChange}
                         onSelect={(addr) => setDropoff(addr)}
                         onBlurFallback={(text) => geocodeField(text, 'dropoff')}
                         placeholder="e.g. JFK Airport, Queens, NY"
                         isLoaded={isLoaded}
+                        locationBias={pickup ?? nearbyBias}
                         inputClassName={styles.addressInput}
                       />
                     </div>
@@ -486,6 +626,7 @@ export default function BookingApp() {
                 </button>
               </div>
             ) : null}
+            </div>
           </div>
         </section>
 
