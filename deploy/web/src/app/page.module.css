@@ -142,47 +142,12 @@
   max-width: 420px;
 }
 
-.bookingShell {
-  position: relative;
-  min-height: 420px;
-}
-
-.bookingShellWithMap {
-  min-height: 640px;
-  border-radius: 20px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-glow);
-}
-
 .bookingCard {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 1.75rem;
   box-shadow: var(--shadow-glow);
-}
-
-.bookingCardOnMap {
-  position: relative;
-  z-index: 2;
-  margin: 1rem;
-  margin-left: auto;
-  max-width: 440px;
-  background: rgba(18, 24, 40, 0.94);
-  backdrop-filter: blur(16px);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-@media (max-width: 900px) {
-  .bookingShellWithMap {
-    min-height: 720px;
-  }
-
-  .bookingCardOnMap {
-    margin: 0.75rem;
-    max-width: none;
-  }
 }
 
 .bookingCard h3 {

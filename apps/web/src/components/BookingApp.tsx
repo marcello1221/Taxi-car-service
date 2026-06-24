@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { useJsApiLoader } from '@react-google-maps/api';
 import {
@@ -14,10 +13,7 @@ import {
   type User,
 } from '@taxi/shared';
 import AddressAutocomplete from './AddressAutocomplete';
-import type { MapTarget } from './BookingMap';
 import styles from '../app/page.module.css';
-
-const BookingMap = dynamic(() => import('./BookingMap'), { ssr: false });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxi-car-service-api.vercel.app';
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -54,7 +50,6 @@ export default function BookingApp() {
   const [bookedRide, setBookedRide] = useState<Ride | null>(null);
   const [pendingApproval, setPendingApproval] = useState<Ride | null>(null);
   const [nearbyBias, setNearbyBias] = useState(DEFAULT_LOCATION_BIAS);
-  const [mapTarget, setMapTarget] = useState<MapTarget>('pickup');
 
   useEffect(() => {
     const minDate = new Date(Date.now() + 15 * 60000);
@@ -161,7 +156,6 @@ export default function BookingApp() {
       if (target === 'pickup') {
         setPickup(addr);
         setPickupText(addr.formatted);
-        setMapTarget('dropoff');
       } else {
         setDropoff(addr);
         setDropoffText(addr.formatted);
@@ -169,36 +163,6 @@ export default function BookingApp() {
       setError('');
     }, () => setError('Location permission denied'));
   }, []);
-
-  const applyAddressToField = useCallback((target: MapTarget, address: Address) => {
-    if (target === 'pickup') {
-      setPickup(address);
-      setPickupText(address.formatted);
-      setMapTarget('dropoff');
-      return;
-    }
-    setDropoff(address);
-    setDropoffText(address.formatted);
-  }, []);
-
-  const handleMapClick = useCallback(
-    async (lat: number, lng: number) => {
-      try {
-        const res = await fetch(`${API_URL}/api/geocode/reverse?lat=${lat}&lng=${lng}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Address not found');
-        applyAddressToField(mapTarget, {
-          formatted: data.formatted,
-          lat: data.lat,
-          lng: data.lng,
-        });
-        setError('');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not detect address on map');
-      }
-    },
-    [applyAddressToField, mapTarget]
-  );
 
   const geocodeText = useCallback(async (text: string): Promise<Address | null> => {
     const trimmed = text.trim();
@@ -407,23 +371,7 @@ export default function BookingApp() {
             <p>Choose Econom, Lux, or Lux SUV. Sign up to book. We lock your fare at booking and confirm traffic 10 minutes before pickup.</p>
           </div>
 
-          <div
-            className={`${styles.bookingShell} ${user && step === 'book' ? styles.bookingShellWithMap : ''}`}
-          >
-            {user && step === 'book' && (
-              <BookingMap
-                center={nearbyBias}
-                pickup={pickup}
-                dropoff={dropoff}
-                mapTarget={mapTarget}
-                onMapTargetChange={setMapTarget}
-                onMapClick={handleMapClick}
-              />
-            )}
-
-            <div
-              className={`${styles.bookingCard} ${user && step === 'book' ? styles.bookingCardOnMap : ''}`}
-            >
+          <div className={styles.bookingCard}>
             {!user ? (
               <>
                 <h3>{authMode === 'signup' ? 'Create your account' : 'Welcome back'}</h3>
@@ -507,20 +455,13 @@ export default function BookingApp() {
 
                 <div className={styles.field}>
                   <label>Pickup address</label>
-                  <p className={styles.fieldHint}>Type or click the map behind this form to set pickup</p>
-                  {!MAPS_KEY && (
-                    <p className={styles.fieldHint}>Tip: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel for faster search.</p>
-                  )}
                   <div className={styles.inputRow}>
                     <div className={styles.autocompleteWrap}>
                       <AddressAutocomplete
                         id="pickup-address"
                         value={pickupText}
                         onChange={handlePickupTextChange}
-                        onSelect={(addr) => {
-                          setPickup(addr);
-                          setMapTarget('dropoff');
-                        }}
+                        onSelect={(addr) => setPickup(addr)}
                         onBlurFallback={(text) => geocodeField(text, 'pickup')}
                         placeholder="e.g. 350 5th Ave, New York, NY"
                         isLoaded={isLoaded}
@@ -534,10 +475,6 @@ export default function BookingApp() {
 
                 <div className={styles.field}>
                   <label>Dropoff address</label>
-                  <p className={styles.fieldHint}>Type or click the map behind this form to set dropoff</p>
-                  {!MAPS_KEY && (
-                    <p className={styles.fieldHint}>Tip: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel for faster search.</p>
-                  )}
                   <div className={styles.inputRow}>
                     <div className={styles.autocompleteWrap}>
                       <AddressAutocomplete
@@ -626,7 +563,6 @@ export default function BookingApp() {
                 </button>
               </div>
             ) : null}
-            </div>
           </div>
         </section>
 
