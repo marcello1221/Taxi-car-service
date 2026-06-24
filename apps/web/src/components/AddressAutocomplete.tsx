@@ -4,7 +4,6 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { Address } from '@taxi/shared';
 import styles from './AddressAutocomplete.module.css';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxi-car-service-api.vercel.app';
 const MIN_CHARS = 3;
 
 export interface PlaceSuggestion {
@@ -58,100 +57,72 @@ export default function AddressAutocomplete({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
 
+  const placesReady = isLoaded && typeof window !== 'undefined' && Boolean(window.google?.maps?.places);
+
   useEffect(() => {
-    if (!isLoaded || !window.google?.maps?.places) return;
+    if (!placesReady) {
+      serviceRef.current = null;
+      placesRef.current = null;
+      return;
+    }
     serviceRef.current = new google.maps.places.AutocompleteService();
     placesRef.current = new google.maps.places.PlacesService(document.createElement('div'));
-  }, [isLoaded]);
+  }, [placesReady]);
 
-  const fetchFromApi = useCallback(async (input: string) => {
-    const res = await fetch(`${API_URL}/api/places/autocomplete?input=${encodeURIComponent(input)}`);
-    if (!res.ok) return [];
-    return (await res.json()) as PlaceSuggestion[];
-  }, []);
+  const loadSuggestions = useCallback((input: string) => {
+    const trimmed = input.trim();
+    if (!serviceRef.current || trimmed.length < MIN_CHARS) {
+      setSuggestions([]);
+      setOpen(false);
+      setActiveIndex(-1);
+      setLoading(false);
+      return;
+    }
 
-  const loadSuggestions = useCallback(
-    (input: string) => {
-      const trimmed = input.trim();
-      if (trimmed.length < MIN_CHARS) {
+    setLoading(true);
+    serviceRef.current.getPlacePredictions(
+      {
+        input: trimmed,
+        componentRestrictions: { country: 'us' },
+        types: ['geocode'],
+      },
+      (predictions, status) => {
+        setLoading(false);
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
+          setSuggestions(predictionsToSuggestions(predictions));
+          setOpen(true);
+          setActiveIndex(-1);
+          return;
+        }
         setSuggestions([]);
         setOpen(false);
         setActiveIndex(-1);
-        return;
       }
-
-      setLoading(true);
-
-      if (serviceRef.current) {
-        serviceRef.current.getPlacePredictions(
-          {
-            input: trimmed,
-            componentRestrictions: { country: 'us' },
-            types: ['geocode'],
-          },
-          (predictions, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && predictions?.length) {
-              setSuggestions(predictionsToSuggestions(predictions));
-              setOpen(true);
-              setActiveIndex(-1);
-              setLoading(false);
-              return;
-            }
-            void fetchFromApi(trimmed)
-              .then((items) => {
-                setSuggestions(items);
-                setOpen(items.length > 0);
-                setActiveIndex(-1);
-              })
-              .finally(() => setLoading(false));
-          }
-        );
-        return;
-      }
-
-      void fetchFromApi(trimmed)
-        .then((items) => {
-          setSuggestions(items);
-          setOpen(items.length > 0);
-          setActiveIndex(-1);
-        })
-        .finally(() => setLoading(false));
-    },
-    [fetchFromApi]
-  );
+    );
+  }, []);
 
   const resolveSuggestion = useCallback(
-    async (suggestion: PlaceSuggestion): Promise<Address | null> => {
-      if (placesRef.current) {
-        return new Promise((resolve) => {
-          placesRef.current!.getDetails(
-            { placeId: suggestion.placeId, fields: ['formatted_address', 'geometry', 'place_id'] },
-            (place, status) => {
-              const loc = place?.geometry?.location;
-              if (status !== google.maps.places.PlacesServiceStatus.OK || !loc) {
-                resolve(null);
-                return;
-              }
-              resolve({
-                formatted: place.formatted_address || suggestion.description,
-                lat: loc.lat(),
-                lng: loc.lng(),
-                placeId: place.place_id,
-              });
-            }
-          );
-        });
-      }
+    (suggestion: PlaceSuggestion): Promise<Address | null> => {
+      if (!placesRef.current) return Promise.resolve(null);
 
-      const res = await fetch(`${API_URL}/api/places/details?placeId=${encodeURIComponent(suggestion.placeId)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return {
-        formatted: data.formatted,
-        lat: data.lat,
-        lng: data.lng,
-        placeId: data.placeId,
-      };
+      return new Promise((resolve) => {
+        placesRef.current!.getDetails(
+          { placeId: suggestion.placeId, fields: ['formatted_address', 'geometry', 'place_id'] },
+          (place, status) => {
+            const loc = place?.geometry?.location;
+            if (status !== google.maps.places.PlacesServiceStatus.OK || !loc) {
+              resolve(null);
+              return;
+            }
+            resolve({
+              formatted: place.formatted_address || suggestion.description,
+              lat: loc.lat(),
+              lng: loc.lng(),
+              placeId: place.place_id,
+            });
+          }
+        );
+      });
     },
     []
   );
@@ -178,6 +149,7 @@ export default function AddressAutocomplete({
   const handleInputChange = (text: string) => {
     skipFetchRef.current = false;
     onChange(text);
+    if (!placesReady) return;
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => loadSuggestions(text), 280);
   };
@@ -225,12 +197,12 @@ export default function AddressAutocomplete({
         id={id}
         type="text"
         role="combobox"
-        aria-autocomplete="list"
+        aria-autocomplete={placesReady ? 'list' : 'none'}
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={placesReady ? listId : undefined}
         value={value}
         onChange={(e) => handleInputChange(e.target.value)}
-        onFocus={() => value.trim().length >= MIN_CHARS && suggestions.length > 0 && setOpen(true)}
+        onFocus={() => placesReady && value.trim().length >= MIN_CHARS && suggestions.length > 0 && setOpen(true)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -238,7 +210,7 @@ export default function AddressAutocomplete({
         autoComplete="off"
       />
 
-      {open && suggestions.length > 0 && (
+      {placesReady && open && suggestions.length > 0 && (
         <ul id={listId} className={styles.suggestions} role="listbox">
           {suggestions.map((suggestion, index) => (
             <li key={suggestion.placeId} role="option" aria-selected={index === activeIndex}>
@@ -261,7 +233,7 @@ export default function AddressAutocomplete({
         </ul>
       )}
 
-      {loading && value.trim().length >= MIN_CHARS && !open && (
+      {placesReady && loading && value.trim().length >= MIN_CHARS && !open && (
         <div className={styles.hint}>Finding addresses…</div>
       )}
     </div>

@@ -383,23 +383,6 @@
   margin: 0.75rem 0;
 }
 
-.mapSection {
-  height: 420px;
-  border-radius: 20px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  margin-bottom: 3rem;
-}
-
-.mapPlaceholder {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-card);
-  color: var(--text-muted);
-}
-
 .services h2 {
   text-align: center;
   margin-bottom: 1.5rem;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
+import { useJsApiLoader } from '@react-google-maps/api';
 import {
   SERVICE_CATEGORIES,
   ACCEPTED_CARD_TYPES,
@@ -18,21 +18,6 @@ import styles from '../app/page.module.css';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taxi-car-service-api.vercel.app';
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const AUTH_KEY = 'taxi_rider_session';
-
-const USA_CENTER = { lat: 39.8283, lng: -98.5795 };
-const mapContainerStyle = { width: '100%', height: '100%' };
-const mapOptions: google.maps.MapOptions = {
-  restriction: { latLngBounds: { north: 49.5, south: 24.5, west: -125, east: -66 }, strictBounds: false },
-  styles: [
-    { elementType: 'geometry', stylers: [{ color: '#0d1117' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#8b95b5' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#0d1117' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1a2238' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a1628' }] },
-  ],
-  disableDefaultUI: true,
-  zoomControl: true,
-};
 
 type Quote = {
   route: { distanceMiles: number; durationMinutes: number; durationInTrafficMinutes?: number };
@@ -60,7 +45,6 @@ export default function BookingApp() {
   const [error, setError] = useState('');
   const [bookedRide, setBookedRide] = useState<Ride | null>(null);
   const [pendingApproval, setPendingApproval] = useState<Ride | null>(null);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
 
   useEffect(() => {
     const minDate = new Date(Date.now() + 15 * 60000);
@@ -185,17 +169,6 @@ export default function BookingApp() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!isLoaded || !pickup || !dropoff) return;
-    const service = new google.maps.DirectionsService();
-    service.route(
-      { origin: pickup, destination: dropoff, travelMode: google.maps.TravelMode.DRIVING },
-      (result, status) => {
-        if (status === 'OK' && result) setDirections(result);
-      }
-    );
-  }, [isLoaded, pickup, dropoff]);
 
   const getQuote = async () => {
     if (!user) {
@@ -505,18 +478,6 @@ export default function BookingApp() {
               </div>
             ) : null}
           </div>
-        </section>
-
-        <section className={styles.mapSection}>
-          {isLoaded ? (
-            <GoogleMap mapContainerStyle={mapContainerStyle} center={pickup ?? USA_CENTER} zoom={pickup ? 12 : 4} options={mapOptions}>
-              {pickup && <Marker position={pickup} label="A" />}
-              {dropoff && <Marker position={dropoff} label="B" />}
-              {directions && <DirectionsRenderer directions={directions} options={{ suppressMarkers: true, polylineOptions: { strokeColor: '#00d4aa', strokeWeight: 4 } }} />}
-            </GoogleMap>
-          ) : (
-            <div className={styles.mapPlaceholder}>Loading USA map…</div>
-          )}
         </section>
 
         <section className={styles.services} id="services">
