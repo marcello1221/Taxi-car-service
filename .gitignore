@@ -22,3 +22,4 @@ exports/
 apps/mobile-driver/android/
 deploy/owner/node_modules/
 deploy/owner/.next/
+deploy/api/src_backup/
