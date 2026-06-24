@@ -110,3 +110,72 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
     formatted: result.formatted_address,
   };
 }
+
+export interface PlaceSuggestion {
+  placeId: string;
+  main: string;
+  secondary: string;
+  description: string;
+}
+
+export async function autocompleteAddress(input: string): Promise<PlaceSuggestion[]> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey || input.trim().length < 3) return [];
+
+  const params = new URLSearchParams({
+    input: input.trim(),
+    components: 'country:us',
+    types: 'geocode',
+    key: apiKey,
+  });
+
+  const res = await fetch(`https://maps.googleapis.com/maps/api/place/autocomplete/json?${params}`);
+  const data = await res.json() as {
+    status: string;
+    predictions?: Array<{
+      place_id: string;
+      description: string;
+      structured_formatting: { main_text: string; secondary_text?: string };
+    }>;
+  };
+
+  if (data.status !== 'OK' || !data.predictions) return [];
+
+  return data.predictions.map((p) => ({
+    placeId: p.place_id,
+    main: p.structured_formatting.main_text,
+    secondary: p.structured_formatting.secondary_text || '',
+    description: p.description,
+  }));
+}
+
+export async function getPlaceDetails(placeId: string): Promise<{ lat: number; lng: number; formatted: string; placeId: string } | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey || !placeId) return null;
+
+  const params = new URLSearchParams({
+    place_id: placeId,
+    fields: 'formatted_address,geometry,place_id',
+    key: apiKey,
+  });
+
+  const res = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?${params}`);
+  const data = await res.json() as {
+    status: string;
+    result?: {
+      place_id: string;
+      formatted_address: string;
+      geometry: { location: { lat: number; lng: number } };
+    };
+  };
+
+  const result = data.result;
+  if (data.status !== 'OK' || !result) return null;
+
+  return {
+    lat: result.geometry.location.lat,
+    lng: result.geometry.location.lng,
+    formatted: result.formatted_address,
+    placeId: result.place_id,
+  };
+}

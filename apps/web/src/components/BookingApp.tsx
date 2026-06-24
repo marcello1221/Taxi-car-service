@@ -395,15 +395,17 @@ export default function BookingApp() {
                 </div>
 
                 <div className={styles.field}>
-                  <label>Pickup (USA address)</label>
+                  <label>Pickup address</label>
+                  <p className={styles.fieldHint}>Start typing for USA address suggestions</p>
                   <div className={styles.inputRow}>
                     <div className={styles.autocompleteWrap}>
                       <AddressAutocomplete
+                        id="pickup-address"
                         value={pickupText}
                         onChange={setPickupText}
                         onSelect={(addr) => setPickup(addr)}
                         onBlurFallback={(text) => geocodeField(text, 'pickup')}
-                        placeholder="Start typing an address…"
+                        placeholder="e.g. 350 5th Ave, New York, NY"
                         isLoaded={isLoaded}
                         inputClassName={styles.addressInput}
                       />
@@ -413,15 +415,17 @@ export default function BookingApp() {
                 </div>
 
                 <div className={styles.field}>
-                  <label>Dropoff</label>
+                  <label>Dropoff address</label>
+                  <p className={styles.fieldHint}>Start typing for USA address suggestions</p>
                   <div className={styles.inputRow}>
                     <div className={styles.autocompleteWrap}>
                       <AddressAutocomplete
+                        id="dropoff-address"
                         value={dropoffText}
                         onChange={setDropoffText}
                         onSelect={(addr) => setDropoff(addr)}
                         onBlurFallback={(text) => geocodeField(text, 'dropoff')}
-                        placeholder="Start typing destination…"
+                        placeholder="e.g. JFK Airport, Queens, NY"
                         isLoaded={isLoaded}
                         inputClassName={styles.addressInput}
                       />

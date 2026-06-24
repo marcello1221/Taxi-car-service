@@ -219,6 +219,13 @@
   margin-bottom: 0.35rem;
 }
 
+.fieldHint {
+  margin: -0.15rem 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
 .field input,
 .field select {
   width: 100%;
