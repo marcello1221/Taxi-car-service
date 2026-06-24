@@ -16,7 +16,7 @@ import {
   getUserRides,
   runEtaConfirmationJob,
 } from './services/rides';
-import { geocodeAddress } from './services/maps';
+import { geocodeAddress, autocompleteAddress, getPlaceDetails } from './services/maps';
 import { registerRider, authenticateRider, getUserById } from './services/auth';
 import { loginStaff, addStaffMember, getStaffList, changeStaffRole, removeStaffMember } from './services/staff';
 import { buildBusinessReport, addExpense, getDriversOverview } from './services/reports';
@@ -109,6 +109,22 @@ app.post('/api/geocode', async (req, res) => {
   const result = await geocodeAddress(address);
   if (!result) {
     res.status(404).json({ error: 'Address not found (USA only)' });
+    return;
+  }
+  res.json(result);
+});
+
+app.get('/api/places/autocomplete', async (req, res) => {
+  const input = String(req.query.input || '');
+  const suggestions = await autocompleteAddress(input);
+  res.json(suggestions);
+});
+
+app.get('/api/places/details', async (req, res) => {
+  const placeId = String(req.query.placeId || '');
+  const result = await getPlaceDetails(placeId);
+  if (!result) {
+    res.status(404).json({ error: 'Place not found' });
     return;
   }
   res.json(result);

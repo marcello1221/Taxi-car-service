@@ -27,7 +27,10 @@ type Quote = {
 type AuthMode = 'signup' | 'login';
 
 export default function BookingApp() {
-  const { isLoaded } = useJsApiLoader({ googleMapsApiKey: MAPS_KEY, libraries: ['places'] });
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: MAPS_KEY,
+    libraries: ['places'],
+  });
 
   const [user, setUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>('signup');
@@ -369,7 +372,10 @@ export default function BookingApp() {
 
                 <div className={styles.field}>
                   <label>Pickup address</label>
-                  <p className={styles.fieldHint}>Start typing for USA address suggestions</p>
+                  <p className={styles.fieldHint}>Type at least 3 characters for USA address suggestions</p>
+                  {!MAPS_KEY && (
+                    <p className={styles.fieldHint}>Tip: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel for faster search.</p>
+                  )}
                   <div className={styles.inputRow}>
                     <div className={styles.autocompleteWrap}>
                       <AddressAutocomplete
@@ -389,7 +395,10 @@ export default function BookingApp() {
 
                 <div className={styles.field}>
                   <label>Dropoff address</label>
-                  <p className={styles.fieldHint}>Start typing for USA address suggestions</p>
+                  <p className={styles.fieldHint}>Type at least 3 characters for USA address suggestions</p>
+                  {!MAPS_KEY && (
+                    <p className={styles.fieldHint}>Tip: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in Vercel for faster search.</p>
+                  )}
                   <div className={styles.inputRow}>
                     <div className={styles.autocompleteWrap}>
                       <AddressAutocomplete
